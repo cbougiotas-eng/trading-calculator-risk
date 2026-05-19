@@ -232,11 +232,12 @@
 
     <!-- ══ CALCULATOR TAB ══ -->
     <div class="tab-panel" id="tab-calculator">
-      <!-- Direction + Currency -->
+
+      <!-- Mode switcher: Stocks vs CFD -->
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-        <div class="toggle-group" id="dir-toggle">
-          <button class="toggle-btn active-long" data-dir="long">▲ LONG</button>
-          <button class="toggle-btn" data-dir="short">▼ SHORT</button>
+        <div class="toggle-group" id="mode-toggle">
+          <button class="toggle-btn active-cur" data-mode="stocks">📈 STOCKS</button>
+          <button class="toggle-btn" data-mode="cfd">📊 CFD</button>
         </div>
         <div class="flex-gap">
           <span id="saving-calc" class="saving" style="display:none;">saving…</span>
@@ -247,25 +248,62 @@
         </div>
       </div>
 
+      <!-- Direction -->
+      <div style="margin-bottom:20px;">
+        <div class="toggle-group" id="dir-toggle" style="display:inline-flex;">
+          <button class="toggle-btn active-long" data-dir="long">▲ LONG</button>
+          <button class="toggle-btn" data-dir="short">▼ SHORT</button>
+        </div>
+      </div>
+
       <!-- Thesis -->
       <div style="margin-bottom:16px;">
         <label class="label">TRADE THESIS (ONE SENTENCE)</label>
         <textarea class="input" id="f-thesis" rows="2" placeholder="Why am I entering this trade?" style="line-height:1.5;"></textarea>
       </div>
 
-      <!-- Input grid -->
-      <div class="grid2" style="margin-bottom:20px;">
-        <div><label class="label" id="lbl-capital">TOTAL CAPITAL (USD)</label><input class="input" id="f-capital" inputmode="decimal" placeholder="0" /></div>
-        <div><label class="label">RISK PER TRADE (%)</label><input class="input" id="f-riskpct" inputmode="decimal" placeholder="0" /></div>
-        <div><label class="label" id="lbl-entry">ENTRY PRICE (USD)</label><input class="input" id="f-entry" inputmode="decimal" placeholder="0" /></div>
-        <div><label class="label" id="lbl-stop">STOP-LOSS (USD)</label><input class="input" id="f-stop" inputmode="decimal" placeholder="0" /></div>
-        <div><label class="label" id="lbl-target">TAKE-PROFIT (USD)</label><input class="input" id="f-target" inputmode="decimal" placeholder="0" /></div>
-        <div><label class="label">COMMISSION PER SHARE</label><input class="input" id="f-commission" inputmode="decimal" placeholder="0" /></div>
-        <div><label class="label">OPEN TRADES (excl. this)</label><input class="input" id="f-opentrades" inputmode="decimal" placeholder="0" /></div>
-        <div><label class="label">SHARES <span style="color:#2a2f3a;">(BLANK = AUTO)</span></label><input class="input" id="f-shares" inputmode="decimal" placeholder="0" /></div>
+      <!-- STOCKS inputs -->
+      <div id="stocks-inputs">
+        <div class="grid2" style="margin-bottom:20px;">
+          <div><label class="label" id="lbl-capital">TOTAL CAPITAL (USD)</label><input class="input" id="f-capital" inputmode="decimal" placeholder="0" /></div>
+          <div><label class="label">RISK PER TRADE (%)</label><input class="input" id="f-riskpct" inputmode="decimal" placeholder="0" /></div>
+          <div><label class="label" id="lbl-entry">ENTRY PRICE (USD)</label><input class="input" id="f-entry" inputmode="decimal" placeholder="0" /></div>
+          <div><label class="label" id="lbl-stop">STOP-LOSS (USD)</label><input class="input" id="f-stop" inputmode="decimal" placeholder="0" /></div>
+          <div><label class="label" id="lbl-target">TAKE-PROFIT (USD)</label><input class="input" id="f-target" inputmode="decimal" placeholder="0" /></div>
+          <div><label class="label">COMMISSION PER SHARE</label><input class="input" id="f-commission" inputmode="decimal" placeholder="0" /></div>
+          <div><label class="label">OPEN TRADES (excl. this)</label><input class="input" id="f-opentrades" inputmode="decimal" placeholder="0" /></div>
+          <div><label class="label">SHARES <span style="color:#2a2f3a;">(BLANK = AUTO)</span></label><input class="input" id="f-shares" inputmode="decimal" placeholder="0" /></div>
+        </div>
       </div>
 
-      <div id="dir-warn-stop" class="banner-red" style="display:none;"></div>
+      <!-- CFD inputs -->
+      <div id="cfd-inputs" style="display:none;">
+        <!-- Instrument preset -->
+        <div style="margin-bottom:16px;">
+          <label class="label">INSTRUMENT</label>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;" id="instrument-grid"></div>
+        </div>
+        <div class="grid2" style="margin-bottom:20px;">
+          <div><label class="label" id="lbl-cfd-capital">TOTAL CAPITAL (USD)</label><input class="input" id="cf-capital" inputmode="decimal" placeholder="0" /></div>
+          <div><label class="label">RISK PER TRADE (%)</label><input class="input" id="cf-riskpct" inputmode="decimal" placeholder="0" /></div>
+          <div><label class="label" id="lbl-cfd-entry">ENTRY PRICE</label><input class="input" id="cf-entry" inputmode="decimal" placeholder="0" /></div>
+          <div><label class="label" id="lbl-cfd-stop">STOP-LOSS</label><input class="input" id="cf-stop" inputmode="decimal" placeholder="0" /></div>
+          <div><label class="label" id="lbl-cfd-target">TAKE-PROFIT</label><input class="input" id="cf-target" inputmode="decimal" placeholder="0" /></div>
+          <div><label class="label">OPEN TRADES (excl. this)</label><input class="input" id="cf-opentrades" inputmode="decimal" placeholder="0" /></div>
+          <div>
+            <label class="label">LOTS <span style="color:#2a2f3a;">(BLANK = AUTO)</span></label>
+            <input class="input" id="cf-lots" inputmode="decimal" placeholder="0" />
+          </div>
+          <div>
+            <label class="label">PIP VALUE / MINI LOT <span style="color:#2a2f3a;">(AUTO)</span></label>
+            <input class="input" id="cf-pipval" inputmode="decimal" placeholder="auto" />
+          </div>
+        </div>
+        <div id="cfd-dir-warn-stop"   class="banner-red" style="display:none;"></div>
+        <div id="cfd-dir-warn-target" class="banner-red" style="display:none;"></div>
+      </div>
+
+      <div id="dir-warn-stop"   class="banner-red" style="display:none;"></div>
       <div id="dir-warn-target" class="banner-red" style="display:none;"></div>
 
       <!-- Results -->
@@ -388,7 +426,7 @@ async function loadData() {
       getDoc(uDoc(uid,"data","trades")),
     ]);
     if (clSnap.exists())    { const d = clSnap.data();    if(d.checked) checked = d.checked; if(d.mood) mood = d.mood; }
-    if (calcSnap.exists())  { const d = calcSnap.data();  if(d.fields) calcFields = {...calcFields,...d.fields}; if(d.cur) calcCur = d.cur; if(d.dir) calcDir = d.dir; }
+    if (calcSnap.exists())  { const d = calcSnap.data();  if(d.fields) calcFields = {...calcFields,...d.fields}; if(d.cfdFields) cfdFields = {...cfdFields,...d.cfdFields}; if(d.cur) calcCur = d.cur; if(d.dir) calcDir = d.dir; if(d.mode) calcMode = d.mode; if(d.cfdInstrument) cfdInstrument = d.cfdInstrument; }
     if (tradeSnap.exists()) { const d = tradeSnap.data(); if(d.list) trades = d.list; }
   } catch(e) { console.error("Load error:", e); }
 
@@ -413,7 +451,7 @@ function saveCalc() {
   $("saving-calc").style.display = "inline";
   clearTimeout(saveTimerCalc);
   saveTimerCalc = setTimeout(async () => {
-    await setDoc(uDoc(uid,"data","calculator"), { fields:calcFields, cur:calcCur, dir:calcDir }, { merge:true });
+    await setDoc(uDoc(uid,"data","calculator"), { fields:calcFields, cfdFields, cur:calcCur, dir:calcDir, mode:calcMode, cfdInstrument }, { merge:true });
     $("saving-calc").style.display = "none";
   }, 800);
 }
@@ -629,8 +667,25 @@ function buildPanicTimer() {
 /* ══════════════════════════════════════
    CALCULATOR
 ══════════════════════════════════════ */
+
+// CFD instrument presets (mini lot = 10,000 units)
+// pipValue = $ per pip per mini lot
+const INSTRUMENTS = [
+  { id:"nas100",  label:"NAS100",  pip:1,     pipVal:1,    desc:"1pt=$1"   },
+  { id:"sp500",   label:"S&P500",  pip:0.25,  pipVal:0.25, desc:"1pt=$0.25"},
+  { id:"dax",     label:"DAX",     pip:1,     pipVal:1,    desc:"1pt=$1"   },
+  { id:"gold",    label:"GOLD",    pip:0.1,   pipVal:1,    desc:"0.1=$1"   },
+  { id:"silver",  label:"SILVER",  pip:0.01,  pipVal:0.5,  desc:"0.01=$0.5"},
+  { id:"oil",     label:"OIL",     pip:0.01,  pipVal:1,    desc:"0.01=$1"  },
+  { id:"custom",  label:"CUSTOM",  pip:1,     pipVal:1,    desc:"manual"   },
+];
+
+let calcMode      = "stocks";   // "stocks" | "cfd"
+let cfdInstrument = "nas100";
+let cfdFields     = { capital:"", riskPct:"", entry:"", stop:"", target:"", opentrades:"", lots:"", pipval:"" };
+
 function buildCalc() {
-  // Restore values
+  // Restore stocks values
   $("f-capital").value    = calcFields.capital;
   $("f-riskpct").value    = calcFields.riskPct;
   $("f-entry").value      = calcFields.entry;
@@ -640,6 +695,23 @@ function buildCalc() {
   $("f-opentrades").value = calcFields.openTrades;
   $("f-shares").value     = calcFields.shares;
   $("f-thesis").value     = calcFields.thesis;
+
+  // Restore CFD values
+  $("cf-capital").value    = cfdFields.capital;
+  $("cf-riskpct").value    = cfdFields.riskPct;
+  $("cf-entry").value      = cfdFields.entry;
+  $("cf-stop").value       = cfdFields.stop;
+  $("cf-target").value     = cfdFields.target;
+  $("cf-opentrades").value = cfdFields.opentrades;
+  $("cf-lots").value       = cfdFields.lots;
+
+  // Mode toggle
+  $("mode-toggle").querySelectorAll(".toggle-btn").forEach(btn => {
+    btn.className = "toggle-btn" + (btn.dataset.mode === calcMode ? " active-cur" : "");
+    btn.onclick = () => { calcMode = btn.dataset.mode; buildCalc(); saveCalc(); };
+  });
+  $("stocks-inputs").style.display = calcMode === "stocks" ? "block" : "none";
+  $("cfd-inputs").style.display    = calcMode === "cfd"    ? "block" : "none";
 
   // Direction
   $("dir-toggle").querySelectorAll(".toggle-btn").forEach(btn => {
@@ -653,22 +725,55 @@ function buildCalc() {
     btn.onclick = () => { calcCur = btn.dataset.cur; buildCalc(); saveCalc(); };
   });
 
-  // Update labels
+  // Stocks labels
   const sym = CURRENCIES[calcCur];
   $("lbl-capital").textContent = `TOTAL CAPITAL (${calcCur})`;
   $("lbl-entry").textContent   = `ENTRY PRICE (${calcCur})`;
   $("lbl-stop").textContent    = `STOP-LOSS (${calcCur})`;
   $("lbl-target").textContent  = `TAKE-PROFIT (${calcCur})`;
 
-  // Input listeners
+  // Stocks input listeners
   ["capital","riskPct","entry","stop","target","commission","openTrades","shares","thesis"].forEach((k,i) => {
     const ids = ["f-capital","f-riskpct","f-entry","f-stop","f-target","f-commission","f-opentrades","f-shares","f-thesis"];
-    const el = $(ids[i]);
-    el.oninput = () => { calcFields[k] = el.value; computeCalc(); saveCalc(); };
+    const el = $(ids[i]); if(!el) return;
+    el.oninput = () => { calcFields[k] = el.value; if(calcMode==="stocks") computeCalc(); saveCalc(); };
   });
 
-  // Focus highlight
+  // Stocks focus highlight
   [["f-capital","#00d4aa"],["f-riskpct","#00d4aa"],["f-entry","#f5a623"],["f-stop","#e8445a"],["f-target","#a78bfa"],["f-commission","#8a909c"],["f-opentrades","#8a909c"],["f-shares","#f5a623"],["f-thesis","#a78bfa"]].forEach(([id,c]) => {
+    const el = $(id); if(!el) return;
+    el.onfocus = () => el.style.borderColor = c;
+    el.onblur  = () => el.style.borderColor = "#1e2229";
+  });
+
+  // CFD labels
+  $("lbl-cfd-capital").textContent = `TOTAL CAPITAL (${calcCur})`;
+
+  // CFD instrument grid
+  const inst = INSTRUMENTS.find(i => i.id === cfdInstrument) || INSTRUMENTS[0];
+  const pipVal = toNum(cfdFields.pipval) || inst.pipVal;
+  $("cf-pipval").value = cfdFields.pipval || inst.pipVal;
+  $("lbl-cfd-entry").textContent  = `ENTRY (${inst.desc})`;
+  $("lbl-cfd-stop").textContent   = `STOP-LOSS`;
+  $("lbl-cfd-target").textContent = `TAKE-PROFIT`;
+
+  const igrid = $("instrument-grid");
+  igrid.innerHTML = INSTRUMENTS.map(ins => `
+    <button style="background:${ins.id===cfdInstrument?'#1e2229':'transparent'};border:1px solid ${ins.id===cfdInstrument?'#00d4aa44':'#1e2229'};border-radius:8px;padding:8px 4px;cursor:pointer;transition:all .2s;text-align:center;" data-ins="${ins.id}">
+      <div style="color:${ins.id===cfdInstrument?'#00d4aa':'#8a909c'};font-size:11px;font-weight:500;letter-spacing:.04em;">${ins.label}</div>
+      <div style="color:#3a3f4a;font-size:9px;margin-top:2px;">${ins.desc}</div>
+    </button>`).join("");
+  igrid.querySelectorAll("button").forEach(btn => {
+    btn.onclick = () => { cfdInstrument = btn.dataset.ins; cfdFields.pipval = ""; buildCalc(); computeCalc(); saveCalc(); };
+  });
+
+  // CFD input listeners
+  [["cf-capital","capital"],["cf-riskpct","riskPct"],["cf-entry","entry"],["cf-stop","stop"],["cf-target","target"],["cf-opentrades","opentrades"],["cf-lots","lots"],["cf-pipval","pipval"]].forEach(([id,k]) => {
+    const el = $(id); if(!el) return;
+    el.oninput = () => { cfdFields[k] = el.value; if(calcMode==="cfd") computeCalc(); saveCalc(); };
+  });
+  // CFD focus highlights
+  [["cf-capital","#00d4aa"],["cf-riskpct","#00d4aa"],["cf-entry","#f5a623"],["cf-stop","#e8445a"],["cf-target","#a78bfa"],["cf-opentrades","#8a909c"],["cf-lots","#f5a623"],["cf-pipval","#8a909c"]].forEach(([id,c]) => {
     const el = $(id); if(!el) return;
     el.onfocus = () => el.style.borderColor = c;
     el.onblur  = () => el.style.borderColor = "#1e2229";
@@ -678,6 +783,8 @@ function buildCalc() {
 }
 
 function computeCalc() {
+  if (calcMode === "cfd") { computeCFD(); return; }
+
   const sym      = CURRENCIES[calcCur];
   const capital  = toNum(calcFields.capital);
   const riskPct  = toNum(calcFields.riskPct);
@@ -692,33 +799,29 @@ function computeCalc() {
   const validStop   = entry>0 && stop>0   && (isLong ? stop<entry   : stop>entry);
   const validTarget = entry>0 && target>0 && (isLong ? target>entry  : target<entry);
 
-  const maxRisk     = capital>0 && riskPct>0 ? capital*riskPct/100 : null;
-  const riskPS      = validStop   ? Math.abs(entry-stop)   : null;
-  const rewardPS    = validTarget ? Math.abs(target-entry)  : null;
-  const rrRatio     = riskPS && rewardPS ? rewardPS/riskPS : null;
-  const suggested   = maxRisk && riskPS ? Math.floor(maxRisk/riskPS) : null;
-  const shares      = sharesM>0 ? sharesM : suggested;
-  const posSize     = shares && entry>0 ? shares*entry : null;
-  const totalComm   = shares && comm>0 ? shares*comm*2 : 0;
-  const maxLoss     = shares && riskPS  ? shares*riskPS+totalComm  : null;
-  const maxGain     = shares && rewardPS ? shares*rewardPS-totalComm : null;
-  const pctCap      = posSize && capital>0 ? posSize/capital*100 : null;
-  const breakEven   = shares && entry>0 && comm>0 ? (isLong ? entry+totalComm/shares : entry-totalComm/shares) : null;
-  const portHeat    = openT>0 && riskPct>0 ? (openT+1)*riskPct : null;
+  const maxRisk   = capital>0 && riskPct>0 ? capital*riskPct/100 : null;
+  const riskPS    = validStop   ? Math.abs(entry-stop)   : null;
+  const rewardPS  = validTarget ? Math.abs(target-entry)  : null;
+  const rrRatio   = riskPS && rewardPS ? rewardPS/riskPS : null;
+  const suggested = maxRisk && riskPS ? Math.floor(maxRisk/riskPS) : null;
+  const shares    = sharesM>0 ? sharesM : suggested;
+  const posSize   = shares && entry>0 ? shares*entry : null;
+  const totalComm = shares && comm>0 ? shares*comm*2 : 0;
+  const maxLoss   = shares && riskPS   ? shares*riskPS+totalComm   : null;
+  const maxGain   = shares && rewardPS ? shares*rewardPS-totalComm : null;
+  const pctCap    = posSize && capital>0 ? posSize/capital*100 : null;
+  const breakEven = shares && entry>0 && comm>0 ? (isLong ? entry+totalComm/shares : entry-totalComm/shares) : null;
+  const portHeat  = openT>0 && riskPct>0 ? (openT+1)*riskPct : null;
 
-  // Update placeholder for shares
-  $("f-shares").placeholder = suggested != null ? `${suggested} (auto)` : "0";
-
-  // Direction warnings
+  $("f-shares").placeholder = suggested!=null ? `${suggested} (auto)` : "0";
   $("dir-warn-stop").style.display   = (calcFields.stop   && calcFields.entry && !validStop)   ? "block" : "none";
   $("dir-warn-target").style.display = (calcFields.target && calcFields.entry && !validTarget) ? "block" : "none";
   $("dir-warn-stop").textContent   = `⚠ Stop-loss is on the wrong side for a ${calcDir} trade.`;
   $("dir-warn-target").textContent = `⚠ Take-profit is on the wrong side for a ${calcDir} trade.`;
 
-  const rrColor = rrRatio==null ? "#4a5060" : rrRatio>=2 ? "#00d4aa" : rrRatio>=1 ? "#f5a623" : "#e8445a";
-  const rrLabel = rrRatio==null ? "" : rrRatio>=2 ? "GOOD" : rrRatio>=1 ? "MARGINAL" : "POOR";
-
-  const row = (label, val, color="#8a909c", sub="") =>
+  const rrColor = rrRatio==null?"#4a5060":rrRatio>=2?"#00d4aa":rrRatio>=1?"#f5a623":"#e8445a";
+  const rrLabel = rrRatio==null?"":rrRatio>=2?"GOOD":rrRatio>=1?"MARGINAL":"POOR";
+  const row = (label,val,color="#8a909c",sub="") =>
     `<div class="result-row"><span class="result-label">${label}${sub?`<span class="result-sub">${sub}</span>`:""}</span><span class="result-val" style="color:${color};">${val}</span></div>`;
 
   $("result-panel").innerHTML =
@@ -728,46 +831,127 @@ function computeCalc() {
     row("SUGGESTED SHARES", suggested!=null?`${suggested}`:"—") +
     row("POSITION SIZE",    fmt(posSize,sym)) +
     row("% OF CAPITAL",     pctCap!=null?`${pctCap.toFixed(1)}%`:"—", pctCap>20?"#e8445a":"#8a909c") +
-    row("COMMISSION (RT)",  totalComm>0?fmt(totalComm,sym):"—", "#8a909c", "round-trip") +
-    row("BREAK-EVEN",       fmt(breakEven,sym), "#f5a623") +
+    row("COMMISSION (RT)",  totalComm>0?fmt(totalComm,sym):"—","#8a909c","round-trip") +
+    row("BREAK-EVEN",       fmt(breakEven,sym),"#f5a623") +
     row("MAX LOSS (net)",   maxLoss!=null?`-${fmt(maxLoss,sym)}`:"—", maxLoss?"#e8445a":"#4a5060") +
     row("MAX GAIN (net)",   fmt(maxGain,sym), maxGain?"#00d4aa":"#4a5060") +
-    row("PORTFOLIO HEAT",   portHeat!=null?`${portHeat.toFixed(1)}%`:"—", portHeat>5?"#e8445a":portHeat>3?"#f5a623":"#8a909c", "all open trades") +
-    `<div class="result-row">
-      <span class="result-label">R:R RATIO</span>
+    row("PORTFOLIO HEAT",   portHeat!=null?`${portHeat.toFixed(1)}%`:"—", portHeat>5?"#e8445a":portHeat>3?"#f5a623":"#8a909c","all open trades") +
+    `<div class="result-row"><span class="result-label">R:R RATIO</span>
       <div style="display:flex;align-items:center;gap:10px;">
         ${rrLabel?`<span style="color:${rrColor};font-size:9px;letter-spacing:.12em;background:${rrColor}22;padding:3px 8px;border-radius:4px;">${rrLabel}</span>`:""}
         <span style="color:${rrColor};font-size:20px;font-weight:700;font-family:'Syne',sans-serif;">${rrRatio!=null?rrRatio.toFixed(2)+"R":"—"}</span>
-      </div>
-    </div>`;
+      </div></div>`;
 
-  // Banners
   const cb = $("calc-banner");
-  if (rrRatio!=null && rrRatio<1.5) { cb.className="banner-red"; cb.textContent="⚠ R:R below 1.5 — consider adjusting your target or skip this trade."; cb.style.display="block"; }
-  else if (rrRatio!=null && rrRatio>=2) { cb.className="banner-green"; cb.textContent="✓ Solid setup — R:R meets swing trading standards."; cb.style.display="block"; }
-  else { cb.style.display="none"; }
+  if (rrRatio!=null&&rrRatio<1.5){cb.className="banner-red";cb.textContent="⚠ R:R below 1.5 — consider adjusting your target or skip this trade.";cb.style.display="block";}
+  else if(rrRatio!=null&&rrRatio>=2){cb.className="banner-green";cb.textContent="✓ Solid setup — R:R meets swing trading standards.";cb.style.display="block";}
+  else{cb.style.display="none";}
+  const hb=$("heat-banner");
+  if(portHeat!=null&&portHeat>5){hb.className="banner-red";hb.textContent=`⚠ Portfolio heat ${portHeat.toFixed(1)}% — you're overexposed.`;hb.style.display="block";}
+  else{hb.style.display="none";}
 
-  const hb = $("heat-banner");
-  if (portHeat!=null && portHeat>5) { hb.className="banner-red"; hb.textContent=`⚠ Portfolio heat ${portHeat.toFixed(1)}% — you're overexposed. Consider reducing position size.`; hb.style.display="block"; }
-  else { hb.style.display="none"; }
+  window._calcResult = { mode:"stocks", sym, entry:calcFields.entry, stop:calcFields.stop, target:calcFields.target, shares, maxLoss, maxGain, rrRatio };
+}
 
-  // Store computed values for logging
-  window._calcResult = { sym, entry:calcFields.entry, stop:calcFields.stop, target:calcFields.target, shares, maxLoss, maxGain, rrRatio };
+function computeCFD() {
+  const sym      = CURRENCIES[calcCur];
+  const capital  = toNum(cfdFields.capital);
+  const riskPct  = toNum(cfdFields.riskPct);
+  const entry    = toNum(cfdFields.entry);
+  const stop     = toNum(cfdFields.stop);
+  const target   = toNum(cfdFields.target);
+  const lotsM    = toNum(cfdFields.lots);
+  const openT    = toNum(cfdFields.opentrades);
+  const isLong   = calcDir === "long";
+
+  const inst     = INSTRUMENTS.find(i => i.id === cfdInstrument) || INSTRUMENTS[0];
+  const pipVal   = toNum(cfdFields.pipval) || inst.pipVal; // $ per pip per mini lot
+  const pipSize  = inst.pip;
+
+  const validStop   = entry>0 && stop>0   && (isLong ? stop<entry   : stop>entry);
+  const validTarget = entry>0 && target>0 && (isLong ? target>entry  : target<entry);
+
+  // pips distance
+  const stopPips   = validStop   ? Math.abs(entry-stop)   / pipSize : null;
+  const targetPips = validTarget ? Math.abs(target-entry) / pipSize : null;
+
+  const maxRisk     = capital>0 && riskPct>0 ? capital*riskPct/100 : null;
+  // risk per mini lot = stopPips * pipVal
+  const riskPerLot  = stopPips  ? stopPips * pipVal  : null;
+  const gainPerLot  = targetPips ? targetPips * pipVal : null;
+  const rrRatio     = riskPerLot && gainPerLot ? gainPerLot/riskPerLot : null;
+  const suggested   = maxRisk && riskPerLot ? +(maxRisk/riskPerLot).toFixed(2) : null;
+  const lots        = lotsM>0 ? lotsM : suggested;
+  const maxLoss     = lots && riskPerLot  ? lots*riskPerLot  : null;
+  const maxGain     = lots && gainPerLot  ? lots*gainPerLot  : null;
+  const portHeat    = openT>0 && riskPct>0 ? (openT+1)*riskPct : null;
+
+  $("cf-lots").placeholder = suggested!=null ? `${suggested} (auto)` : "0";
+
+  $("cfd-dir-warn-stop").style.display   = (cfdFields.stop   && cfdFields.entry && !validStop)   ? "block" : "none";
+  $("cfd-dir-warn-target").style.display = (cfdFields.target && cfdFields.entry && !validTarget) ? "block" : "none";
+  $("cfd-dir-warn-stop").textContent   = `⚠ Stop is on the wrong side for a ${calcDir} trade.`;
+  $("cfd-dir-warn-target").textContent = `⚠ Target is on the wrong side for a ${calcDir} trade.`;
+
+  const rrColor = rrRatio==null?"#4a5060":rrRatio>=2?"#00d4aa":rrRatio>=1?"#f5a623":"#e8445a";
+  const rrLabel = rrRatio==null?"":rrRatio>=2?"GOOD":rrRatio>=1?"MARGINAL":"POOR";
+  const row = (label,val,color="#8a909c",sub="") =>
+    `<div class="result-row"><span class="result-label">${label}${sub?`<span class="result-sub">${sub}</span>`:""}</span><span class="result-val" style="color:${color};">${val}</span></div>`;
+
+  $("result-panel").innerHTML =
+    row("MAX RISK AMOUNT",    fmt(maxRisk,sym),        maxRisk?"#e8445a":"#4a5060") +
+    row("STOP DISTANCE",      stopPips!=null?`${stopPips.toFixed(1)} pts`:"—") +
+    row("TARGET DISTANCE",    targetPips!=null?`${targetPips.toFixed(1)} pts`:"—") +
+    row("PIP VALUE / LOT",    `${sym}${pipVal} / pt`, "#8a909c", "mini lot") +
+    row("RISK PER LOT",       fmt(riskPerLot,sym)) +
+    row("SUGGESTED LOTS",     suggested!=null?`${suggested} lots`:"—") +
+    row("MAX LOSS",           maxLoss!=null?`-${fmt(maxLoss,sym)}`:"—", maxLoss?"#e8445a":"#4a5060") +
+    row("MAX GAIN",           fmt(maxGain,sym),        maxGain?"#00d4aa":"#4a5060") +
+    row("PORTFOLIO HEAT",     portHeat!=null?`${portHeat.toFixed(1)}%`:"—", portHeat>5?"#e8445a":portHeat>3?"#f5a623":"#8a909c","all open trades") +
+    `<div class="result-row"><span class="result-label">R:R RATIO</span>
+      <div style="display:flex;align-items:center;gap:10px;">
+        ${rrLabel?`<span style="color:${rrColor};font-size:9px;letter-spacing:.12em;background:${rrColor}22;padding:3px 8px;border-radius:4px;">${rrLabel}</span>`:""}
+        <span style="color:${rrColor};font-size:20px;font-weight:700;font-family:'Syne',sans-serif;">${rrRatio!=null?rrRatio.toFixed(2)+"R":"—"}</span>
+      </div></div>`;
+
+  const cb=$("calc-banner");
+  if(rrRatio!=null&&rrRatio<1.5){cb.className="banner-red";cb.textContent="⚠ R:R below 1.5 — consider adjusting your target or skip this trade.";cb.style.display="block";}
+  else if(rrRatio!=null&&rrRatio>=2){cb.className="banner-green";cb.textContent="✓ Solid setup — R:R meets swing trading standards.";cb.style.display="block";}
+  else{cb.style.display="none";}
+  const hb=$("heat-banner");
+  if(portHeat!=null&&portHeat>5){hb.className="banner-red";hb.textContent=`⚠ Portfolio heat ${portHeat.toFixed(1)}% — you're overexposed.`;hb.style.display="block";}
+  else{hb.style.display="none";}
+
+  window._calcResult = { mode:"cfd", sym, instrument:inst.label, entry:cfdFields.entry, stop:cfdFields.stop, target:cfdFields.target, lots, stopPips, targetPips, maxLoss, maxGain, rrRatio };
 }
 
 $("log-trade-btn").onclick = () => {
-  if (!calcFields.entry || !calcFields.stop || !calcFields.target) { alert("Enter entry, stop and target first."); return; }
   const r = window._calcResult || {};
-  trades.push({ date:new Date().toISOString(), dir:calcDir, cur:calcCur, entry:calcFields.entry, stop:calcFields.stop, target:calcFields.target, shares:r.shares||"", maxLoss:r.maxLoss, maxGain:r.maxGain, rr:r.rrRatio, thesis:calcFields.thesis, result:"", exitPrice:"", discipline:"", notes:"" });
-  saveTrades();
-  renderLog();
-  switchTab("log");
+  if (calcMode === "stocks") {
+    if (!calcFields.entry || !calcFields.stop || !calcFields.target) { alert("Enter entry, stop and target first."); return; }
+    trades.push({ date:new Date().toISOString(), mode:"stocks", dir:calcDir, cur:calcCur,
+      entry:calcFields.entry, stop:calcFields.stop, target:calcFields.target,
+      shares:r.shares||"", maxLoss:r.maxLoss, maxGain:r.maxGain, rr:r.rrRatio,
+      thesis:calcFields.thesis, result:"", exitPrice:"", discipline:"", notes:"" });
+  } else {
+    if (!cfdFields.entry || !cfdFields.stop || !cfdFields.target) { alert("Enter entry, stop and target first."); return; }
+    const inst = INSTRUMENTS.find(i=>i.id===cfdInstrument)||INSTRUMENTS[0];
+    trades.push({ date:new Date().toISOString(), mode:"cfd", dir:calcDir, cur:calcCur,
+      instrument:inst.label, entry:cfdFields.entry, stop:cfdFields.stop, target:cfdFields.target,
+      lots:r.lots||"", stopPips:r.stopPips, targetPips:r.targetPips,
+      maxLoss:r.maxLoss, maxGain:r.maxGain, rr:r.rrRatio,
+      thesis:calcFields.thesis, result:"", exitPrice:"", discipline:"", notes:"" });
+  }
+  saveTrades(); renderLog(); switchTab("log");
 };
 
 $("clear-trade-btn").onclick = () => {
-  ["entry","stop","target","shares","thesis"].forEach(k => calcFields[k] = "");
-  buildCalc();
-  saveCalc();
+  if (calcMode === "stocks") {
+    ["entry","stop","target","shares","thesis"].forEach(k => calcFields[k] = "");
+  } else {
+    ["entry","stop","target","lots"].forEach(k => cfdFields[k] = "");
+  }
+  buildCalc(); saveCalc();
 };
 $("clear-trade-btn").onmouseenter = e => { e.target.style.borderColor="#e8445a"; e.target.style.color="#e8445a"; };
 $("clear-trade-btn").onmouseleave = e => { e.target.style.borderColor="#2a2f3a"; e.target.style.color="#4a5060"; };
@@ -814,6 +998,7 @@ function renderLog() {
             <div>
               <div class="trade-meta">
                 <span class="chip ${t.dir==='long'?'chip-long':'chip-short'}">${t.dir==='long'?'▲ LONG':'▼ SHORT'}</span>
+                    ${t.mode==='cfd'?'<span style=\'color:#a78bfa;font-size:9px;background:#a78bfa22;padding:2px 7px;border-radius:4px;letter-spacing:.08em;\'>CFD</span>':''}
                 <span style="color:#4a5060;font-size:10px;">${fmtDate(t.date)}</span>
                 ${isOpen ? '<span class="chip chip-open">OPEN</span>' : ""}
                 ${t.result==="win"  ? '<span style="color:#00d4aa;font-size:9px;">✓ WIN</span>'  : ""}
@@ -829,6 +1014,10 @@ function renderLog() {
             <div class="trade-num-box"><div class="trade-num-lbl">STOP</div><div class="trade-num-val">${sym(t)}${t.stop}</div></div>
             <div class="trade-num-box"><div class="trade-num-lbl">TARGET</div><div class="trade-num-val">${sym(t)}${t.target}</div></div>
             <div class="trade-num-box"><div class="trade-num-lbl">R:R</div><div class="trade-num-val">${t.rr!=null?parseFloat(t.rr).toFixed(1)+"R":"—"}</div></div>
+            ${t.mode==="cfd"&&t.instrument?`<div class="trade-num-box"><div class="trade-num-lbl">INSTRUMENT</div><div class="trade-num-val" style="color:#a78bfa;">${t.instrument}</div></div>`:""}
+            ${t.mode==="cfd"&&t.lots?`<div class="trade-num-box"><div class="trade-num-lbl">LOTS</div><div class="trade-num-val">${t.lots}</div></div>`:""}
+            ${t.mode==="cfd"&&t.stopPips?`<div class="trade-num-box"><div class="trade-num-lbl">STOP PTS</div><div class="trade-num-val">${parseFloat(t.stopPips).toFixed(1)}</div></div>`:""}
+            ${t.mode==="stocks"&&t.shares?`<div class="trade-num-box"><div class="trade-num-lbl">SHARES</div><div class="trade-num-val">${t.shares}</div></div>`:""}
           </div>
           ${isOpen ? `
             <div id="close-area-${i}">
