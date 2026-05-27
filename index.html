@@ -278,10 +278,15 @@
 
       <!-- CFD inputs -->
       <div id="cfd-inputs" style="display:none;">
-        <!-- Instrument preset -->
+        <!-- Symbol browser -->
         <div style="margin-bottom:16px;">
-          <label class="label">INSTRUMENT</label>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;" id="instrument-grid"></div>
+          <label class="label">SYMBOL <span style="color:#3a3f4a;font-size:9px;letter-spacing:.06em;">PEPPERSTONE</span></label>
+          <div style="position:relative;margin-bottom:8px;">
+            <input class="input" id="symbol-search" placeholder="Search… NAS100, Gold, DAX, Silver" autocomplete="off" />
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;" id="sym-cats"></div>
+          <div id="sym-list" style="display:none;background:#0d1014;border:1px solid #1e2229;border-radius:8px;max-height:200px;overflow-y:auto;margin-bottom:8px;"></div>
+          <div id="sym-selected"></div>
         </div>
         <div class="grid2" style="margin-bottom:20px;">
           <div><label class="label" id="lbl-cfd-capital">TOTAL CAPITAL (USD)</label><input class="input" id="cf-capital" inputmode="decimal" placeholder="0" /></div>
@@ -297,6 +302,10 @@
           <div>
             <label class="label">PIP VALUE / MINI LOT <span style="color:#2a2f3a;">(AUTO)</span></label>
             <input class="input" id="cf-pipval" inputmode="decimal" placeholder="auto" />
+          </div>
+          <div>
+            <label class="label">LEVERAGE (e.g. 100)</label>
+            <input class="input" id="cf-leverage" inputmode="decimal" placeholder="100" />
           </div>
         </div>
         <div id="cfd-dir-warn-stop"   class="banner-red" style="display:none;"></div>
@@ -426,7 +435,7 @@ async function loadData() {
       getDoc(uDoc(uid,"data","trades")),
     ]);
     if (clSnap.exists())    { const d = clSnap.data();    if(d.checked) checked = d.checked; if(d.mood) mood = d.mood; }
-    if (calcSnap.exists())  { const d = calcSnap.data();  if(d.fields) calcFields = {...calcFields,...d.fields}; if(d.cfdFields) cfdFields = {...cfdFields,...d.cfdFields}; if(d.cur) calcCur = d.cur; if(d.dir) calcDir = d.dir; if(d.mode) calcMode = d.mode; if(d.cfdInstrument) cfdInstrument = d.cfdInstrument; }
+    if (calcSnap.exists())  { const d = calcSnap.data();  if(d.fields) calcFields = {...calcFields,...d.fields}; if(d.cfdFields) cfdFields = {...cfdFields,...d.cfdFields}; if(d.cur) calcCur = d.cur; if(d.dir) calcDir = d.dir; if(d.mode) calcMode = d.mode; if(d.cfdSymbolId) cfdSymbolId = d.cfdSymbolId; }
     if (tradeSnap.exists()) { const d = tradeSnap.data(); if(d.list) trades = d.list; }
   } catch(e) { console.error("Load error:", e); }
 
@@ -451,7 +460,7 @@ function saveCalc() {
   $("saving-calc").style.display = "inline";
   clearTimeout(saveTimerCalc);
   saveTimerCalc = setTimeout(async () => {
-    await setDoc(uDoc(uid,"data","calculator"), { fields:calcFields, cfdFields, cur:calcCur, dir:calcDir, mode:calcMode, cfdInstrument }, { merge:true });
+    await setDoc(uDoc(uid,"data","calculator"), { fields:calcFields, cfdFields, cur:calcCur, dir:calcDir, mode:calcMode, cfdSymbolId }, { merge:true });
     $("saving-calc").style.display = "none";
   }, 800);
 }
@@ -668,21 +677,57 @@ function buildPanicTimer() {
    CALCULATOR
 ══════════════════════════════════════ */
 
-// CFD instrument presets (mini lot = 10,000 units)
-// pipValue = $ per pip per mini lot
-const INSTRUMENTS = [
-  { id:"nas100",  label:"NAS100",  pip:1,     pipVal:1,    desc:"1pt=$1"   },
-  { id:"sp500",   label:"S&P500",  pip:0.25,  pipVal:0.25, desc:"1pt=$0.25"},
-  { id:"dax",     label:"DAX",     pip:1,     pipVal:1,    desc:"1pt=$1"   },
-  { id:"gold",    label:"GOLD",    pip:0.1,   pipVal:1,    desc:"0.1=$1"   },
-  { id:"silver",  label:"SILVER",  pip:0.01,  pipVal:0.5,  desc:"0.01=$0.5"},
-  { id:"oil",     label:"OIL",     pip:0.01,  pipVal:1,    desc:"0.01=$1"  },
-  { id:"custom",  label:"CUSTOM",  pip:1,     pipVal:1,    desc:"manual"   },
+// ── Pepperstone symbol list (no Forex) ──
+// contractSize = units per 1 lot
+// pointSize    = minimum price movement (1 point)
+// pointValue   = $ per point per lot  (in symbol currency)
+// currency     = currency of the point value
+// minLot / lotStep for display only
+const SYMBOLS = [
+  // ── US Indices ──
+  { id:"NAS100",  cat:"Indices", flag:"🇺🇸", label:"NAS100",   full:"Nasdaq 100",          contractSize:100,  pointSize:1,      pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.9 pts"  },
+  { id:"US500",   cat:"Indices", flag:"🇺🇸", label:"US500",    full:"S&P 500",             contractSize:100,  pointSize:0.1,    pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.4 pts"  },
+  { id:"US30",    cat:"Indices", flag:"🇺🇸", label:"US30",     full:"Dow Jones 30",        contractSize:100,  pointSize:1,      pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"2.4 pts"  },
+  { id:"US2000",  cat:"Indices", flag:"🇺🇸", label:"US2000",   full:"Russell 2000",        contractSize:100,  pointSize:0.1,    pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.5 pts"  },
+  // ── European Indices ──
+  { id:"GER40",   cat:"Indices", flag:"🇩🇪", label:"GER40",    full:"Germany 40 (DAX)",    contractSize:25,   pointSize:1,      pointValue:1,      currency:"EUR", minLot:0.01, lotStep:0.01, spread:"1.2 pts"  },
+  { id:"UK100",   cat:"Indices", flag:"🇬🇧", label:"UK100",    full:"FTSE 100",            contractSize:10,   pointSize:1,      pointValue:1,      currency:"GBP", minLot:0.01, lotStep:0.01, spread:"1.0 pts"  },
+  { id:"FRA40",   cat:"Indices", flag:"🇫🇷", label:"FRA40",    full:"CAC 40",              contractSize:10,   pointSize:1,      pointValue:1,      currency:"EUR", minLot:0.01, lotStep:0.01, spread:"1.5 pts"  },
+  { id:"EUSTX50", cat:"Indices", flag:"🇪🇺", label:"EUSTX50",  full:"Euro Stoxx 50",       contractSize:10,   pointSize:1,      pointValue:1,      currency:"EUR", minLot:0.01, lotStep:0.01, spread:"2.0 pts"  },
+  { id:"SWI20",   cat:"Indices", flag:"🇨🇭", label:"SWI20",    full:"Swiss Market Index",  contractSize:10,   pointSize:1,      pointValue:1,      currency:"CHF", minLot:0.01, lotStep:0.01, spread:"5.0 pts"  },
+  { id:"NED25",   cat:"Indices", flag:"🇳🇱", label:"NED25",    full:"AEX Netherlands 25",  contractSize:200,  pointSize:0.01,   pointValue:2,      currency:"EUR", minLot:0.01, lotStep:0.01, spread:"0.3 pts"  },
+  // ── Asian / Pacific Indices ──
+  { id:"AUS200",  cat:"Indices", flag:"🇦🇺", label:"AUS200",   full:"Australia 200",       contractSize:25,   pointSize:1,      pointValue:1,      currency:"AUD", minLot:0.01, lotStep:0.01, spread:"1.0 pts"  },
+  { id:"JPN225",  cat:"Indices", flag:"🇯🇵", label:"JPN225",   full:"Japan 225",           contractSize:100,  pointSize:1,      pointValue:1,      currency:"JPY", minLot:0.01, lotStep:0.01, spread:"6.0 pts"  },
+  { id:"HK50",    cat:"Indices", flag:"🇭🇰", label:"HK50",     full:"Hang Seng 50",        contractSize:50,   pointSize:1,      pointValue:1,      currency:"HKD", minLot:0.01, lotStep:0.01, spread:"8.0 pts"  },
+  { id:"CHINAH",  cat:"Indices", flag:"🇨🇳", label:"CHINAH",   full:"China H-Shares",      contractSize:50,   pointSize:1,      pointValue:1,      currency:"HKD", minLot:0.01, lotStep:0.01, spread:"10 pts"   },
+  { id:"SING30",  cat:"Indices", flag:"🇸🇬", label:"SING30",   full:"Singapore 30",        contractSize:200,  pointSize:0.1,    pointValue:1,       currency:"SGD", minLot:0.01, lotStep:0.01, spread:"0.6 pts"  },
+  // ── Metals ──
+  { id:"XAUUSD",  cat:"Metals",  flag:"🥇", label:"XAUUSD",   full:"Gold vs USD",         contractSize:100,  pointSize:0.01,   pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.1 pts"  },
+  { id:"XAGUSD",  cat:"Metals",  flag:"🥈", label:"XAGUSD",   full:"Silver vs USD",       contractSize:5000, pointSize:0.001,  pointValue:5,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.03 pts" },
+  { id:"XPTUSD",  cat:"Metals",  flag:"⚪", label:"XPTUSD",   full:"Platinum vs USD",     contractSize:100,  pointSize:0.01,   pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"2.0 pts"  },
+  { id:"XPDUSD",  cat:"Metals",  flag:"🔘", label:"XPDUSD",   full:"Palladium vs USD",    contractSize:100,  pointSize:0.01,   pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"5.0 pts"  },
+  { id:"XCUUSD",  cat:"Metals",  flag:"🟤", label:"XCUUSD",   full:"Copper vs USD",       contractSize:25000,pointSize:0.0001, pointValue:2.5,    currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.004 pts"},
+  // ── Energies ──
+  { id:"USOIL",   cat:"Energy",  flag:"🛢️", label:"USOIL",    full:"WTI Crude Oil",       contractSize:1000, pointSize:0.01,   pointValue:10,     currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.04 pts" },
+  { id:"UKOIL",   cat:"Energy",  flag:"🛢️", label:"UKOIL",    full:"Brent Crude Oil",     contractSize:1000, pointSize:0.01,   pointValue:10,     currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.04 pts" },
+  { id:"NATGAS",  cat:"Energy",  flag:"⛽", label:"NATGAS",   full:"Natural Gas",         contractSize:10000,pointSize:0.001,  pointValue:10,     currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.01 pts" },
+  // ── Crypto ──
+  { id:"BTCUSD",  cat:"Crypto",  flag:"₿",  label:"BTCUSD",   full:"Bitcoin vs USD",      contractSize:1,    pointSize:1,      pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"25 pts"   },
+  { id:"ETHUSD",  cat:"Crypto",  flag:"Ξ",  label:"ETHUSD",   full:"Ethereum vs USD",     contractSize:1,    pointSize:0.1,    pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"1.5 pts"  },
+  // ── Custom ──
+  { id:"CUSTOM",  cat:"Custom",  flag:"⚙️", label:"CUSTOM",   full:"Custom instrument",   contractSize:100,  pointSize:1,      pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"—"        },
 ];
 
-let calcMode      = "stocks";   // "stocks" | "cfd"
-let cfdInstrument = "nas100";
-let cfdFields     = { capital:"", riskPct:"", entry:"", stop:"", target:"", opentrades:"", lots:"", pipval:"" };
+const SYM_CATS = ["All", "Indices", "Metals", "Energy", "Crypto", "Custom"];
+
+let calcMode      = "stocks";
+let cfdSymbolId   = "NAS100";
+let symCatFilter  = "All";
+// Keep backward compat
+const INSTRUMENTS = SYMBOLS;
+const inst2sym = id => SYMBOLS.find(s=>s.id===id) || SYMBOLS[0];
+let cfdFields     = { capital:"", riskPct:"", entry:"", stop:"", target:"", opentrades:"", lots:"", pipval:"", leverage:"" };
 
 function buildCalc() {
   // Restore stocks values
@@ -704,6 +749,7 @@ function buildCalc() {
   $("cf-target").value     = cfdFields.target;
   $("cf-opentrades").value = cfdFields.opentrades;
   $("cf-lots").value       = cfdFields.lots;
+  $("cf-leverage").value   = cfdFields.leverage;
 
   // Mode toggle
   $("mode-toggle").querySelectorAll(".toggle-btn").forEach(btn => {
@@ -749,31 +795,91 @@ function buildCalc() {
   // CFD labels
   $("lbl-cfd-capital").textContent = `TOTAL CAPITAL (${calcCur})`;
 
-  // CFD instrument grid
-  const inst = INSTRUMENTS.find(i => i.id === cfdInstrument) || INSTRUMENTS[0];
-  const pipVal = toNum(cfdFields.pipval) || inst.pipVal;
-  $("cf-pipval").value = cfdFields.pipval || inst.pipVal;
-  $("lbl-cfd-entry").textContent  = `ENTRY (${inst.desc})`;
+  // ── Symbol browser ──
+  const instSym = inst2sym(cfdSymbolId);
+  const ptVal = toNum(cfdFields.pipval) || instSym.pointValue;
+  $("cf-pipval").value       = cfdFields.pipval || instSym.pointValue;
+  $("lbl-cfd-entry").textContent  = `ENTRY`;
   $("lbl-cfd-stop").textContent   = `STOP-LOSS`;
   $("lbl-cfd-target").textContent = `TAKE-PROFIT`;
 
-  const igrid = $("instrument-grid");
-  igrid.innerHTML = INSTRUMENTS.map(ins => `
-    <button style="background:${ins.id===cfdInstrument?'#1e2229':'transparent'};border:1px solid ${ins.id===cfdInstrument?'#00d4aa44':'#1e2229'};border-radius:8px;padding:8px 4px;cursor:pointer;transition:all .2s;text-align:center;" data-ins="${ins.id}">
-      <div style="color:${ins.id===cfdInstrument?'#00d4aa':'#8a909c'};font-size:11px;font-weight:500;letter-spacing:.04em;">${ins.label}</div>
-      <div style="color:#3a3f4a;font-size:9px;margin-top:2px;">${ins.desc}</div>
-    </button>`).join("");
-  igrid.querySelectorAll("button").forEach(btn => {
-    btn.onclick = () => { cfdInstrument = btn.dataset.ins; cfdFields.pipval = ""; buildCalc(); computeCalc(); saveCalc(); };
+  // Category pills
+  const symCatEl = $("sym-cats");
+  symCatEl.innerHTML = SYM_CATS.map(c => `
+    <button style="background:${c===symCatFilter?'#1e2229':'transparent'};border:1px solid ${c===symCatFilter?'#00d4aa44':'#1e2229'};border-radius:20px;padding:4px 12px;cursor:pointer;color:${c===symCatFilter?'#00d4aa':'#4a5060'};font-size:10px;letter-spacing:.06em;white-space:nowrap;transition:all .2s;" data-cat="${c}">${c.toUpperCase()}</button>`).join("");
+  symCatEl.querySelectorAll("button").forEach(btn => {
+    btn.onclick = () => { symCatFilter = btn.dataset.cat; buildCalc(); };
   });
 
+  // Symbol search + filter
+  const searchEl = $("symbol-search");
+  const listEl   = $("sym-list");
+  const query    = searchEl.value.toLowerCase();
+  const filtered = SYMBOLS.filter(s => {
+    const matchCat = symCatFilter === "All" || s.cat === symCatFilter;
+    const matchQ   = !query || s.label.toLowerCase().includes(query) || s.full.toLowerCase().includes(query);
+    return matchCat && matchQ;
+  });
+
+  const showList = query.length > 0 || symCatFilter !== "All";
+  listEl.style.display = showList ? "block" : "none";
+  listEl.innerHTML = filtered.map(s => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #141720;cursor:pointer;transition:background .15s;${s.id===cfdSymbolId?'background:#1a1d24;':''}" data-sid="${s.id}" class="sym-row">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:16px;">${s.flag}</span>
+        <div>
+          <div style="color:${s.id===cfdSymbolId?'#00d4aa':'#d0d4dc'};font-size:12px;font-weight:500;letter-spacing:.04em;">${s.label}</div>
+          <div style="color:#4a5060;font-size:10px;margin-top:1px;">${s.full}</div>
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div style="color:#8a909c;font-size:10px;">${s.pointValue} ${s.currency}/pt</div>
+        <div style="color:#3a3f4a;font-size:9px;margin-top:1px;">spread ~${s.spread}</div>
+      </div>
+    </div>`).join("") || `<div style="padding:14px;color:#3a3f4a;font-size:12px;text-align:center;">No symbols found</div>`;
+
+  listEl.querySelectorAll(".sym-row").forEach(row => {
+    row.onmouseenter = () => { if(row.dataset.sid!==cfdSymbolId) row.style.background="#151820"; };
+    row.onmouseleave = () => { if(row.dataset.sid!==cfdSymbolId) row.style.background="transparent"; };
+    row.onclick = () => {
+      cfdSymbolId = row.dataset.sid;
+      cfdFields.pipval = "";
+      searchEl.value = "";
+      symCatFilter = "All";
+      buildCalc(); computeCalc(); saveCalc();
+    };
+  });
+
+  // Set up search listener (only once)
+  searchEl.oninput = () => { buildCalc(); };
+  searchEl.onfocus = () => { listEl.style.display = "block"; searchEl.style.borderColor="#00d4aa"; };
+  searchEl.onblur  = () => { setTimeout(() => { if(!searchEl.value) listEl.style.display="none"; searchEl.style.borderColor="#1e2229"; }, 200); };
+
+  // Selected symbol card
+  const selEl = $("sym-selected");
+  selEl.innerHTML = `
+    <div style="background:#13161c;border:1px solid #00d4aa33;border-radius:8px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:20px;">${instSym.flag}</span>
+        <div>
+          <div style="color:#00d4aa;font-size:13px;font-weight:500;letter-spacing:.04em;">${instSym.label}</div>
+          <div style="color:#4a5060;font-size:10px;margin-top:2px;">${instSym.full}</div>
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div style="color:#8a909c;font-size:10px;">Contract: ${instSym.contractSize.toLocaleString()} units</div>
+        <div style="color:#8a909c;font-size:10px;margin-top:2px;">Point: ${instSym.pointSize} | Val: ${instSym.pointValue} ${instSym.currency}</div>
+        <div style="color:#3a3f4a;font-size:9px;margin-top:2px;">Min lot: ${instSym.minLot} | Spread ~${instSym.spread}</div>
+      </div>
+    </div>`;
+
   // CFD input listeners
-  [["cf-capital","capital"],["cf-riskpct","riskPct"],["cf-entry","entry"],["cf-stop","stop"],["cf-target","target"],["cf-opentrades","opentrades"],["cf-lots","lots"],["cf-pipval","pipval"]].forEach(([id,k]) => {
+  [["cf-capital","capital"],["cf-riskpct","riskPct"],["cf-entry","entry"],["cf-stop","stop"],["cf-target","target"],["cf-opentrades","opentrades"],["cf-lots","lots"],["cf-pipval","pipval"],["cf-leverage","leverage"]].forEach(([id,k]) => {
     const el = $(id); if(!el) return;
     el.oninput = () => { cfdFields[k] = el.value; if(calcMode==="cfd") computeCalc(); saveCalc(); };
   });
   // CFD focus highlights
-  [["cf-capital","#00d4aa"],["cf-riskpct","#00d4aa"],["cf-entry","#f5a623"],["cf-stop","#e8445a"],["cf-target","#a78bfa"],["cf-opentrades","#8a909c"],["cf-lots","#f5a623"],["cf-pipval","#8a909c"]].forEach(([id,c]) => {
+  [["cf-capital","#00d4aa"],["cf-riskpct","#00d4aa"],["cf-entry","#f5a623"],["cf-stop","#e8445a"],["cf-target","#a78bfa"],["cf-opentrades","#8a909c"],["cf-lots","#f5a623"],["cf-pipval","#8a909c"],["cf-leverage","#8a909c"]].forEach(([id,c]) => {
     const el = $(id); if(!el) return;
     el.onfocus = () => el.style.borderColor = c;
     el.onblur  = () => el.style.borderColor = "#1e2229";
@@ -854,7 +960,7 @@ function computeCalc() {
 }
 
 function computeCFD() {
-  const sym      = CURRENCIES[calcCur];
+  const curSym   = CURRENCIES[calcCur];
   const capital  = toNum(cfdFields.capital);
   const riskPct  = toNum(cfdFields.riskPct);
   const entry    = toNum(cfdFields.entry);
@@ -864,9 +970,9 @@ function computeCFD() {
   const openT    = toNum(cfdFields.opentrades);
   const isLong   = calcDir === "long";
 
-  const inst     = INSTRUMENTS.find(i => i.id === cfdInstrument) || INSTRUMENTS[0];
-  const pipVal   = toNum(cfdFields.pipval) || inst.pipVal; // $ per pip per mini lot
-  const pipSize  = inst.pip;
+  const inst     = inst2sym(cfdSymbolId);
+  const pipVal   = toNum(cfdFields.pipval) || inst.pointValue; // $ per point per lot
+  const pipSize  = inst.pointSize;
 
   const validStop   = entry>0 && stop>0   && (isLong ? stop<entry   : stop>entry);
   const validTarget = entry>0 && target>0 && (isLong ? target>entry  : target<entry);
@@ -885,8 +991,13 @@ function computeCFD() {
   const maxLoss     = lots && riskPerLot  ? lots*riskPerLot  : null;
   const maxGain     = lots && gainPerLot  ? lots*gainPerLot  : null;
   const portHeat    = openT>0 && riskPct>0 ? (openT+1)*riskPct : null;
+  // Used margin = (lots * contractSize * entry price) / leverage
+  const leverage    = toNum(cfdFields.leverage) || 100;
+  const usedMargin  = lots && entry>0 ? (lots * inst.contractSize * entry) / leverage : null;
+  const marginPct   = usedMargin && capital>0 ? (usedMargin/capital)*100 : null;
 
-  $("cf-lots").placeholder = suggested!=null ? `${suggested} (auto)` : "0";
+  // Only set placeholder if user has not typed a value
+  if (!cfdFields.lots) $("cf-lots").placeholder = suggested!=null ? `${suggested} (auto)` : "0";
 
   $("cfd-dir-warn-stop").style.display   = (cfdFields.stop   && cfdFields.entry && !validStop)   ? "block" : "none";
   $("cfd-dir-warn-target").style.display = (cfdFields.target && cfdFields.entry && !validTarget) ? "block" : "none";
@@ -899,14 +1010,16 @@ function computeCFD() {
     `<div class="result-row"><span class="result-label">${label}${sub?`<span class="result-sub">${sub}</span>`:""}</span><span class="result-val" style="color:${color};">${val}</span></div>`;
 
   $("result-panel").innerHTML =
-    row("MAX RISK AMOUNT",    fmt(maxRisk,sym),        maxRisk?"#e8445a":"#4a5060") +
+    row("MAX RISK AMOUNT",    fmt(maxRisk,curSym),        maxRisk?"#e8445a":"#4a5060") +
     row("STOP DISTANCE",      stopPips!=null?`${stopPips.toFixed(1)} pts`:"—") +
     row("TARGET DISTANCE",    targetPips!=null?`${targetPips.toFixed(1)} pts`:"—") +
-    row("PIP VALUE / LOT",    `${sym}${pipVal} / pt`, "#8a909c", "mini lot") +
-    row("RISK PER LOT",       fmt(riskPerLot,sym)) +
+    row("POINT VALUE / LOT",  `${inst.pointValue} ${inst.currency}/pt`, "#8a909c", "1 lot") +
+    row("RISK PER LOT",       fmt(riskPerLot,curSym)) +
     row("SUGGESTED LOTS",     suggested!=null?`${suggested} lots`:"—") +
-    row("MAX LOSS",           maxLoss!=null?`-${fmt(maxLoss,sym)}`:"—", maxLoss?"#e8445a":"#4a5060") +
-    row("MAX GAIN",           fmt(maxGain,sym),        maxGain?"#00d4aa":"#4a5060") +
+    row("MAX LOSS",           maxLoss!=null?`-${fmt(maxLoss,curSym)}`:"—", maxLoss?"#e8445a":"#4a5060") +
+    row("MAX GAIN",           fmt(maxGain,curSym),        maxGain?"#00d4aa":"#4a5060") +
+    row("USED MARGIN",        usedMargin!=null?fmt(usedMargin,curSym):"—", usedMargin?"#f5a623":"#4a5060", `÷${leverage}`) +
+    row("MARGIN % OF CAPITAL",marginPct!=null?`${marginPct.toFixed(1)}%`:"—", marginPct>50?"#e8445a":marginPct>25?"#f5a623":"#8a909c") +
     row("PORTFOLIO HEAT",     portHeat!=null?`${portHeat.toFixed(1)}%`:"—", portHeat>5?"#e8445a":portHeat>3?"#f5a623":"#8a909c","all open trades") +
     `<div class="result-row"><span class="result-label">R:R RATIO</span>
       <div style="display:flex;align-items:center;gap:10px;">
@@ -922,7 +1035,7 @@ function computeCFD() {
   if(portHeat!=null&&portHeat>5){hb.className="banner-red";hb.textContent=`⚠ Portfolio heat ${portHeat.toFixed(1)}% — you're overexposed.`;hb.style.display="block";}
   else{hb.style.display="none";}
 
-  window._calcResult = { mode:"cfd", sym, instrument:inst.label, entry:cfdFields.entry, stop:cfdFields.stop, target:cfdFields.target, lots, stopPips, targetPips, maxLoss, maxGain, rrRatio };
+  window._calcResult = { mode:"cfd", sym:curSym, instrument:inst.label, entry:cfdFields.entry, stop:cfdFields.stop, target:cfdFields.target, lots, stopPips, targetPips, maxLoss, maxGain, rrRatio };
 }
 
 $("log-trade-btn").onclick = () => {
@@ -935,7 +1048,7 @@ $("log-trade-btn").onclick = () => {
       thesis:calcFields.thesis, result:"", exitPrice:"", discipline:"", notes:"" });
   } else {
     if (!cfdFields.entry || !cfdFields.stop || !cfdFields.target) { alert("Enter entry, stop and target first."); return; }
-    const inst = INSTRUMENTS.find(i=>i.id===cfdInstrument)||INSTRUMENTS[0];
+    const inst = INSTRUMENTS.find(i=>i.id===cfdSymbolId)||INSTRUMENTS[0];
     trades.push({ date:new Date().toISOString(), mode:"cfd", dir:calcDir, cur:calcCur,
       instrument:inst.label, entry:cfdFields.entry, stop:cfdFields.stop, target:cfdFields.target,
       lots:r.lots||"", stopPips:r.stopPips, targetPips:r.targetPips,
