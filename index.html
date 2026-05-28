@@ -437,6 +437,8 @@ async function loadData() {
     if (clSnap.exists())    { const d = clSnap.data();    if(d.checked) checked = d.checked; if(d.mood) mood = d.mood; }
     if (calcSnap.exists())  { const d = calcSnap.data();  if(d.fields) calcFields = {...calcFields,...d.fields}; if(d.cfdFields) cfdFields = {...cfdFields,...d.cfdFields}; if(d.cur) calcCur = d.cur; if(d.dir) calcDir = d.dir; if(d.mode) calcMode = d.mode; if(d.cfdSymbolId) cfdSymbolId = d.cfdSymbolId; }
     if (tradeSnap.exists()) { const d = tradeSnap.data(); if(d.list) trades = d.list; }
+    const custSnap = await getDoc(uDoc(uid,"data","customSymbols"));
+    if (custSnap.exists() && custSnap.data().list) customSymbols = custSnap.data().list;
   } catch(e) { console.error("Load error:", e); }
 
   buildChecklist();
@@ -463,6 +465,11 @@ function saveCalc() {
     await setDoc(uDoc(uid,"data","calculator"), { fields:calcFields, cfdFields, cur:calcCur, dir:calcDir, mode:calcMode, cfdSymbolId }, { merge:true });
     $("saving-calc").style.display = "none";
   }, 800);
+}
+
+async function saveCustomSymbols() {
+  if (!uid) return;
+  await setDoc(uDoc(uid,"data","customSymbols"), { list: customSymbols });
 }
 
 async function saveTrades() {
@@ -724,9 +731,12 @@ const SYM_CATS = ["All", "Indices", "Metals", "Energy", "Crypto", "Custom"];
 let calcMode      = "stocks";
 let cfdSymbolId   = "NAS100";
 let symCatFilter  = "All";
-// Keep backward compat
+let customSymbols = [];   // user-added symbols, loaded from Firestore
+
+// Merge presets + custom — always call this instead of SYMBOLS directly
+const allSymbols  = () => [...SYMBOLS, ...customSymbols];
 const INSTRUMENTS = SYMBOLS;
-const inst2sym = id => SYMBOLS.find(s=>s.id===id) || SYMBOLS[0];
+const inst2sym    = id => allSymbols().find(s=>s.id===id) || SYMBOLS[0];
 let cfdFields     = { capital:"", riskPct:"", entry:"", stop:"", target:"", opentrades:"", lots:"", pipval:"", leverage:"" };
 
 function buildCalc() {
@@ -814,34 +824,60 @@ function buildCalc() {
   // Symbol search + filter
   const searchEl = $("symbol-search");
   const listEl   = $("sym-list");
-  const query    = searchEl.value.toLowerCase();
-  const filtered = SYMBOLS.filter(s => {
+  const query    = searchEl.value.toLowerCase().trim();
+  const all      = allSymbols();
+  const filtered = all.filter(s => {
     const matchCat = symCatFilter === "All" || s.cat === symCatFilter;
     const matchQ   = !query || s.label.toLowerCase().includes(query) || s.full.toLowerCase().includes(query);
     return matchCat && matchQ;
   });
 
+  const exactMatch = all.some(s => s.label.toLowerCase() === query);
   const showList = query.length > 0 || symCatFilter !== "All";
   listEl.style.display = showList ? "block" : "none";
-  listEl.innerHTML = filtered.map(s => `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #141720;cursor:pointer;transition:background .15s;${s.id===cfdSymbolId?'background:#1a1d24;':''}" data-sid="${s.id}" class="sym-row">
+
+  // Build rows
+  const symRows = filtered.map(s => {
+    const isCustom = customSymbols.some(c => c.id === s.id);
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #141720;cursor:pointer;transition:background .15s;${s.id===cfdSymbolId?'background:#1a1d24;':''}" data-sid="${s.id}" class="sym-row">
       <div style="display:flex;align-items:center;gap:10px;">
         <span style="font-size:16px;">${s.flag}</span>
         <div>
-          <div style="color:${s.id===cfdSymbolId?'#00d4aa':'#d0d4dc'};font-size:12px;font-weight:500;letter-spacing:.04em;">${s.label}</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="color:${s.id===cfdSymbolId?'#00d4aa':'#d0d4dc'};font-size:12px;font-weight:500;letter-spacing:.04em;">${s.label}</span>
+            ${isCustom ? '<span style="color:#a78bfa;font-size:8px;background:#a78bfa22;padding:1px 5px;border-radius:3px;">CUSTOM</span>' : ''}
+          </div>
           <div style="color:#4a5060;font-size:10px;margin-top:1px;">${s.full}</div>
         </div>
       </div>
-      <div style="text-align:right;">
-        <div style="color:#8a909c;font-size:10px;">${s.pointValue} ${s.currency}/pt</div>
-        <div style="color:#3a3f4a;font-size:9px;margin-top:1px;">spread ~${s.spread}</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="text-align:right;">
+          <div style="color:#8a909c;font-size:10px;">${s.pointValue} ${s.currency}/pt</div>
+          <div style="color:#3a3f4a;font-size:9px;margin-top:1px;">contract: ${s.contractSize.toLocaleString()}</div>
+        </div>
+        ${isCustom ? `<button class="del-sym-btn" data-sid="${s.id}" style="background:transparent;border:none;color:#3a3f4a;cursor:pointer;font-size:14px;padding:2px 4px;flex-shrink:0;" title="Remove">×</button>` : ''}
       </div>
-    </div>`).join("") || `<div style="padding:14px;color:#3a3f4a;font-size:12px;text-align:center;">No symbols found</div>`;
+    </div>`;
+  }).join("");
 
+  // "Add symbol" row — shown when query has text and no exact match
+  const addRow = (query.length >= 2 && !exactMatch) ? `
+    <div id="add-sym-row" style="padding:12px 14px;border-top:1px solid #1e2229;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background .15s;" >
+      <span style="color:#00d4aa;font-size:16px;">＋</span>
+      <div>
+        <div style="color:#00d4aa;font-size:12px;letter-spacing:.04em;">Add "${searchEl.value.toUpperCase().trim()}"</div>
+        <div style="color:#4a5060;font-size:10px;margin-top:1px;">Set point value &amp; contract size</div>
+      </div>
+    </div>` : "";
+
+  listEl.innerHTML = (symRows || `<div style="padding:14px;color:#3a3f4a;font-size:12px;text-align:center;">No symbols found</div>`) + addRow;
+
+  // Row click → select symbol
   listEl.querySelectorAll(".sym-row").forEach(row => {
     row.onmouseenter = () => { if(row.dataset.sid!==cfdSymbolId) row.style.background="#151820"; };
     row.onmouseleave = () => { if(row.dataset.sid!==cfdSymbolId) row.style.background="transparent"; };
-    row.onclick = () => {
+    row.onclick = (e) => {
+      if(e.target.classList.contains("del-sym-btn")) return;
       cfdSymbolId = row.dataset.sid;
       cfdFields.pipval = "";
       searchEl.value = "";
@@ -850,28 +886,197 @@ function buildCalc() {
     };
   });
 
-  // Set up search listener (only once)
+  // Delete custom symbol
+  listEl.querySelectorAll(".del-sym-btn").forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const sid = btn.dataset.sid;
+      if (!confirm(`Remove ${sid} from your symbols?`)) return;
+      customSymbols = customSymbols.filter(s => s.id !== sid);
+      if (cfdSymbolId === sid) { cfdSymbolId = "NAS100"; cfdFields.pipval = ""; }
+      saveCustomSymbols(); buildCalc(); computeCalc();
+    };
+  });
+
+  // "Add symbol" click → show inline form
+  const addRowEl = $("add-sym-row");
+  if (addRowEl) {
+    addRowEl.onmouseenter = () => addRowEl.style.background="#151820";
+    addRowEl.onmouseleave = () => addRowEl.style.background="transparent";
+    addRowEl.onclick = () => {
+      const name = searchEl.value.toUpperCase().trim();
+      listEl.style.display = "none";
+      // Render add form in selEl
+      const selEl2 = $("sym-selected");
+      selEl2.innerHTML = `
+        <div style="background:#13161c;border:1px solid #a78bfa44;border-radius:10px;padding:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <span style="color:#a78bfa;font-size:12px;letter-spacing:.06em;">ADD SYMBOL</span>
+            <button id="cancel-add-sym" style="background:transparent;border:none;color:#4a5060;cursor:pointer;font-size:16px;">×</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+            <div style="grid-column:1/-1;">
+              <label class="label">SYMBOL NAME</label>
+              <input class="input" id="new-sym-name" value="${name}" placeholder="e.g. EUROSTOXX" style="text-transform:uppercase;" />
+            </div>
+            <div>
+              <label class="label">POINT VALUE ($ per pt per lot)</label>
+              <input class="input" id="new-sym-ptval" inputmode="decimal" placeholder="1" />
+            </div>
+            <div>
+              <label class="label">CONTRACT SIZE (units/lot)</label>
+              <input class="input" id="new-sym-contract" inputmode="decimal" placeholder="100" />
+            </div>
+            <div>
+              <label class="label">POINT SIZE (min move)</label>
+              <input class="input" id="new-sym-ptsize" inputmode="decimal" placeholder="1" />
+            </div>
+            <div>
+              <label class="label">CURRENCY</label>
+              <input class="input" id="new-sym-currency" placeholder="USD" />
+            </div>
+          </div>
+          <button id="save-add-sym" class="btn-green" style="width:100%;">＋ ADD SYMBOL</button>
+        </div>`;
+
+      $("new-sym-name").oninput = (e) => { e.target.value = e.target.value.toUpperCase(); };
+
+      $("cancel-add-sym").onclick = () => { searchEl.value = ""; buildCalc(); };
+
+      $("save-add-sym").onclick = () => {
+        const label    = $("new-sym-name").value.trim().toUpperCase();
+        const ptVal    = parseFloat($("new-sym-ptval").value)    || 1;
+        const contract = parseFloat($("new-sym-contract").value) || 100;
+        const ptSize   = parseFloat($("new-sym-ptsize").value)   || 1;
+        const currency = $("new-sym-currency").value.trim().toUpperCase() || "USD";
+        if (!label) { $("new-sym-name").style.borderColor="#e8445a"; return; }
+        if (allSymbols().some(s => s.id === label)) {
+          alert(`${label} already exists. Search for it above.`); return;
+        }
+        const newSym = {
+          id: label, cat: "Custom", flag: "⚙️", label, full: label,
+          contractSize: contract, pointSize: ptSize, pointValue: ptVal,
+          currency, minLot: 0.01, lotStep: 0.01, spread: "—", custom: true,
+        };
+        customSymbols.push(newSym);
+        cfdSymbolId = label;
+        cfdFields.pipval = "";
+        searchEl.value = "";
+        symCatFilter = "All";
+        saveCustomSymbols(); buildCalc(); computeCalc(); saveCalc();
+      };
+      return; // skip re-rendering selEl below
+    };
+  }
+
+  // Set up search listener
   searchEl.oninput = () => { buildCalc(); };
   searchEl.onfocus = () => { listEl.style.display = "block"; searchEl.style.borderColor="#00d4aa"; };
   searchEl.onblur  = () => { setTimeout(() => { if(!searchEl.value) listEl.style.display="none"; searchEl.style.borderColor="#1e2229"; }, 200); };
 
-  // Selected symbol card
+  // Selected symbol card — skip if add/edit form is showing
   const selEl = $("sym-selected");
-  selEl.innerHTML = `
-    <div style="background:#13161c;border:1px solid #00d4aa33;border-radius:8px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span style="font-size:20px;">${instSym.flag}</span>
-        <div>
-          <div style="color:#00d4aa;font-size:13px;font-weight:500;letter-spacing:.04em;">${instSym.label}</div>
-          <div style="color:#4a5060;font-size:10px;margin-top:2px;">${instSym.full}</div>
+  if (!selEl.querySelector("#save-add-sym") && !selEl.querySelector("#save-edit-sym")) {
+    const isCustom = customSymbols.some(c => c.id === instSym.id);
+    selEl.innerHTML = `
+      <div style="background:#13161c;border:1px solid #00d4aa33;border-radius:8px;padding:12px 14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:20px;">${instSym.flag}</span>
+            <div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span style="color:#00d4aa;font-size:13px;font-weight:500;letter-spacing:.04em;">${instSym.label}</span>
+                ${isCustom ? '<span style="color:#a78bfa;font-size:8px;background:#a78bfa22;padding:1px 5px;border-radius:3px;">CUSTOM</span>' : ''}
+              </div>
+              <div style="color:#4a5060;font-size:10px;margin-top:2px;">${instSym.full}</div>
+            </div>
+          </div>
+          <button id="edit-sym-btn" style="background:transparent;border:1px solid #2a2f3a;color:#4a5060;font-size:10px;padding:5px 12px;border-radius:6px;cursor:pointer;letter-spacing:.06em;transition:all .2s;">EDIT</button>
         </div>
-      </div>
-      <div style="text-align:right;">
-        <div style="color:#8a909c;font-size:10px;">Contract: ${instSym.contractSize.toLocaleString()} units</div>
-        <div style="color:#8a909c;font-size:10px;margin-top:2px;">Point: ${instSym.pointSize} | Val: ${instSym.pointValue} ${instSym.currency}</div>
-        <div style="color:#3a3f4a;font-size:9px;margin-top:2px;">Min lot: ${instSym.minLot} | Spread ~${instSym.spread}</div>
-      </div>
-    </div>`;
+        <div style="display:flex;gap:16px;margin-top:10px;padding-top:10px;border-top:1px solid #1e2229;flex-wrap:wrap;">
+          <div><div style="color:#4a5060;font-size:9px;letter-spacing:.08em;">CONTRACT</div><div style="color:#8a909c;font-size:11px;margin-top:2px;">${instSym.contractSize.toLocaleString()} units</div></div>
+          <div><div style="color:#4a5060;font-size:9px;letter-spacing:.08em;">POINT SIZE</div><div style="color:#8a909c;font-size:11px;margin-top:2px;">${instSym.pointSize}</div></div>
+          <div><div style="color:#4a5060;font-size:9px;letter-spacing:.08em;">POINT VALUE</div><div style="color:#8a909c;font-size:11px;margin-top:2px;">${instSym.pointValue} ${instSym.currency}/lot</div></div>
+          <div><div style="color:#4a5060;font-size:9px;letter-spacing:.08em;">MIN LOT</div><div style="color:#8a909c;font-size:11px;margin-top:2px;">${instSym.minLot}</div></div>
+        </div>
+      </div>`;
+
+    // Edit button → open edit form
+    $("edit-sym-btn").onmouseenter = e => { e.target.style.borderColor="#a78bfa"; e.target.style.color="#a78bfa"; };
+    $("edit-sym-btn").onmouseleave = e => { e.target.style.borderColor="#2a2f3a"; e.target.style.color="#4a5060"; };
+    $("edit-sym-btn").onclick = () => {
+      selEl.innerHTML = `
+        <div style="background:#13161c;border:1px solid #a78bfa44;border-radius:10px;padding:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <span style="color:#a78bfa;font-size:12px;letter-spacing:.06em;">EDIT SYMBOL</span>
+            <button id="cancel-edit-sym" style="background:transparent;border:none;color:#4a5060;cursor:pointer;font-size:16px;">×</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+            <div style="grid-column:1/-1;">
+              <label class="label">SYMBOL NAME</label>
+              <input class="input" id="edit-sym-name" value="${instSym.label}" style="text-transform:uppercase;" />
+            </div>
+            <div>
+              <label class="label">POINT VALUE ($ per pt per lot)</label>
+              <input class="input" id="edit-sym-ptval" inputmode="decimal" value="${instSym.pointValue}" />
+            </div>
+            <div>
+              <label class="label">CONTRACT SIZE (units/lot)</label>
+              <input class="input" id="edit-sym-contract" inputmode="decimal" value="${instSym.contractSize}" />
+            </div>
+            <div>
+              <label class="label">POINT SIZE (min move)</label>
+              <input class="input" id="edit-sym-ptsize" inputmode="decimal" value="${instSym.pointSize}" />
+            </div>
+            <div>
+              <label class="label">CURRENCY</label>
+              <input class="input" id="edit-sym-currency" value="${instSym.currency}" />
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button id="save-edit-sym" class="btn-green" style="flex:1;">SAVE CHANGES</button>
+            ${isCustom ? `<button id="del-edit-sym" style="background:#e8445a22;border:1px solid #e8445a55;color:#e8445a;font-size:11px;padding:8px 16px;border-radius:6px;cursor:pointer;">DELETE</button>` : ''}
+          </div>
+        </div>`;
+
+      $("edit-sym-name").oninput = e => { e.target.value = e.target.value.toUpperCase(); };
+      $("cancel-edit-sym").onclick = () => buildCalc();
+
+      $("save-edit-sym").onclick = () => {
+        const label    = $("edit-sym-name").value.trim().toUpperCase();
+        const ptVal    = parseFloat($("edit-sym-ptval").value)    || instSym.pointValue;
+        const contract = parseFloat($("edit-sym-contract").value) || instSym.contractSize;
+        const ptSize   = parseFloat($("edit-sym-ptsize").value)   || instSym.pointSize;
+        const currency = $("edit-sym-currency").value.trim().toUpperCase() || instSym.currency;
+        if (!label) { $("edit-sym-name").style.borderColor="#e8445a"; return; }
+
+        const updated = { ...instSym, label, full: label, pointValue: ptVal,
+          contractSize: contract, pointSize: ptSize, currency, custom: true };
+
+        // If it's already custom, update in place; otherwise add as custom override
+        const existIdx = customSymbols.findIndex(s => s.id === instSym.id);
+        if (existIdx > -1) {
+          customSymbols[existIdx] = { ...updated, id: instSym.id };
+        } else {
+          // Preset override — save as custom with same id
+          customSymbols.push({ ...updated, id: instSym.id });
+        }
+        cfdSymbolId = instSym.id;
+        cfdFields.pipval = "";
+        saveCustomSymbols(); buildCalc(); computeCalc(); saveCalc();
+      };
+
+      const delBtn = $("del-edit-sym");
+      if (delBtn) {
+        delBtn.onclick = () => {
+          if (!confirm(`Delete ${instSym.label}?`)) return;
+          customSymbols = customSymbols.filter(s => s.id !== instSym.id);
+          cfdSymbolId = "NAS100"; cfdFields.pipval = "";
+          saveCustomSymbols(); buildCalc(); computeCalc();
+        };
+      }
+    };
+  } // end if not showing form
 
   // CFD input listeners
   [["cf-capital","capital"],["cf-riskpct","riskPct"],["cf-entry","entry"],["cf-stop","stop"],["cf-target","target"],["cf-opentrades","opentrades"],["cf-lots","lots"],["cf-pipval","pipval"],["cf-leverage","leverage"]].forEach(([id,k]) => {
