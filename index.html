@@ -318,6 +318,32 @@
       <!-- Results -->
       <div class="result-panel" id="result-panel"></div>
 
+      <div id="swap-section" style="background:#0d1014;border:1px solid #1a1d24;border-radius:10px;margin-bottom:16px;overflow:hidden;">
+        <div id="swap-hdr" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;user-select:none;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:14px;">⏱</span>
+            <span style="color:#d0d4dc;font-size:11px;letter-spacing:.08em;">SWAP &amp; HOLDING COST</span>
+          </div>
+          <span id="swap-chev" style="color:#3a3f4a;font-size:16px;transition:transform .2s;display:inline-block;transform:rotate(-90deg);">▾</span>
+        </div>
+        <div id="swap-body" style="display:none;padding:0 16px 16px;border-top:1px solid #1a1d24;">
+          <div id="swap-cfd-inputs">
+            <div class="grid2" style="margin:14px 0 12px;">
+              <div><label class="label">LONG SWAP ($/lot/night)</label><input class="input" id="sw-long" inputmode="decimal" placeholder="e.g. -5.00" /></div>
+              <div><label class="label">SHORT SWAP ($/lot/night)</label><input class="input" id="sw-short" inputmode="decimal" placeholder="e.g. 3.00" /></div>
+              <div><label class="label">DAYS TO HOLD</label><input class="input" id="sw-days" inputmode="decimal" placeholder="optional" /></div>
+            </div>
+          </div>
+          <div id="swap-stocks-inputs" style="display:none;">
+            <div class="grid2" style="margin:14px 0 12px;">
+              <div><label class="label">FINANCING RATE (% / year)</label><input class="input" id="sw-finrate" inputmode="decimal" placeholder="e.g. 6.5" /></div>
+              <div><label class="label">DAYS TO HOLD</label><input class="input" id="sw-days-s" inputmode="decimal" placeholder="optional" /></div>
+            </div>
+          </div>
+          <div id="swap-results" style="background:#13161c;border-radius:8px;padding:4px 14px 8px;border:1px solid #1e2229;min-height:36px;"></div>
+        </div>
+      </div>
+
       <div id="calc-banner" style="display:none;"></div>
       <div id="heat-banner" style="display:none;"></div>
 
@@ -435,7 +461,7 @@ async function loadData() {
       getDoc(uDoc(uid,"data","trades")),
     ]);
     if (clSnap.exists())    { const d = clSnap.data();    if(d.checked) checked = d.checked; if(d.mood) mood = d.mood; }
-    if (calcSnap.exists())  { const d = calcSnap.data();  if(d.fields) calcFields = {...calcFields,...d.fields}; if(d.cfdFields) cfdFields = {...cfdFields,...d.cfdFields}; if(d.cur) calcCur = d.cur; if(d.dir) calcDir = d.dir; if(d.mode) calcMode = d.mode; if(d.cfdSymbolId) cfdSymbolId = d.cfdSymbolId; }
+    if (calcSnap.exists())  { const d = calcSnap.data();  if(d.fields) calcFields = {...calcFields,...d.fields}; if(d.cfdFields) cfdFields = {...cfdFields,...d.cfdFields}; if(d.cur) calcCur = d.cur; if(d.dir) calcDir = d.dir; if(d.mode) calcMode = d.mode; if(d.cfdSymbolId) cfdSymbolId = d.cfdSymbolId; if(d.swapFields) swapFields = {...swapFields,...d.swapFields}; }
     if (tradeSnap.exists()) { const d = tradeSnap.data(); if(d.list) trades = d.list; }
     const custSnap = await getDoc(uDoc(uid,"data","customSymbols"));
     if (custSnap.exists() && custSnap.data().list) customSymbols = custSnap.data().list;
@@ -462,7 +488,7 @@ function saveCalc() {
   $("saving-calc").style.display = "inline";
   clearTimeout(saveTimerCalc);
   saveTimerCalc = setTimeout(async () => {
-    await setDoc(uDoc(uid,"data","calculator"), { fields:calcFields, cfdFields, cur:calcCur, dir:calcDir, mode:calcMode, cfdSymbolId }, { merge:true });
+    await setDoc(uDoc(uid,"data","calculator"), { fields:calcFields, cfdFields, cur:calcCur, dir:calcDir, mode:calcMode, cfdSymbolId, swapFields }, { merge:true });
     $("saving-calc").style.display = "none";
   }, 800);
 }
@@ -738,6 +764,8 @@ const allSymbols  = () => [...SYMBOLS, ...customSymbols];
 const INSTRUMENTS = SYMBOLS;
 const inst2sym    = id => allSymbols().find(s=>s.id===id) || SYMBOLS[0];
 let cfdFields     = { capital:"", riskPct:"", entry:"", stop:"", target:"", opentrades:"", lots:"", pipval:"", leverage:"" };
+let swapFields    = { long:"", short:"", days:"", finRate:"", daysS:"" };
+let swapOpen      = false;
 
 function buildCalc() {
   // Restore stocks values
@@ -1090,6 +1118,25 @@ function buildCalc() {
     el.onblur  = () => el.style.borderColor = "#1e2229";
   });
 
+  // ── Swap section ──
+  $("sw-long").value    = swapFields.long;
+  $("sw-short").value   = swapFields.short;
+  $("sw-days").value    = swapFields.days;
+  $("sw-finrate").value = swapFields.finRate;
+  $("sw-days-s").value  = swapFields.daysS;
+  $("swap-cfd-inputs").style.display    = calcMode === "cfd"    ? "block" : "none";
+  $("swap-stocks-inputs").style.display = calcMode === "stocks" ? "block" : "none";
+  $("sw-long").oninput    = () => { swapFields.long    = $("sw-long").value;    computeSwap(); saveCalc(); };
+  $("sw-short").oninput   = () => { swapFields.short   = $("sw-short").value;   computeSwap(); saveCalc(); };
+  $("sw-days").oninput    = () => { swapFields.days    = $("sw-days").value;    computeSwap(); saveCalc(); };
+  $("sw-finrate").oninput = () => { swapFields.finRate = $("sw-finrate").value; computeSwap(); saveCalc(); };
+  $("sw-days-s").oninput  = () => { swapFields.daysS   = $("sw-days-s").value;  computeSwap(); saveCalc(); };
+  $("swap-hdr").onclick = () => {
+    swapOpen = !swapOpen;
+    $("swap-body").style.display = swapOpen ? "block" : "none";
+    $("swap-chev").style.transform = swapOpen ? "rotate(0deg)" : "rotate(-90deg)";
+  };
+
   computeCalc();
 }
 
@@ -1162,6 +1209,7 @@ function computeCalc() {
   else{hb.style.display="none";}
 
   window._calcResult = { mode:"stocks", sym, entry:calcFields.entry, stop:calcFields.stop, target:calcFields.target, shares, maxLoss, maxGain, rrRatio };
+  computeSwap();
 }
 
 function computeCFD() {
@@ -1241,6 +1289,93 @@ function computeCFD() {
   else{hb.style.display="none";}
 
   window._calcResult = { mode:"cfd", sym:curSym, instrument:inst.label, entry:cfdFields.entry, stop:cfdFields.stop, target:cfdFields.target, lots, stopPips, targetPips, maxLoss, maxGain, rrRatio };
+  computeSwap();
+}
+
+function computeSwap() {
+  const res = $("swap-results");
+  if (!res) return;
+  const r = window._calcResult || {};
+  const rowS = (label, val, color, sub) =>
+    `<div class="result-row"><span class="result-label">${label}${sub ? `<span class="result-sub">${sub}</span>` : ""}</span><span class="result-val" style="color:${color};">${val}</span></div>`;
+  const empty = msg => { res.innerHTML = `<div style="padding:12px 0;color:#3a3f4a;font-size:11px;text-align:center;letter-spacing:.05em;">${msg}</div>`; };
+
+  if (calcMode === "cfd") {
+    const lots     = r.lots;
+    const maxGain  = r.maxGain;
+    const curSym   = CURRENCIES[calcCur];
+    const rateStr  = calcDir === "long" ? swapFields.long : swapFields.short;
+    const swapRate = parseFloat(rateStr);
+
+    if (isNaN(swapRate)) { empty("Enter swap rate above to calculate holding cost."); return; }
+    if (swapRate === 0)  { empty("No daily swap cost — holding is free for this direction."); return; }
+
+    const isPaying   = swapRate < 0;
+    const dailyCost  = lots ? Math.abs(swapRate * lots) : null;
+    const dailyLabel = isPaying ? "DAILY SWAP COST" : "DAILY SWAP CREDIT";
+    const daysHeld   = toNum(swapFields.days);
+    const totalSwap  = dailyCost && daysHeld > 0 ? dailyCost * daysHeld : null;
+    const gainAfter  = maxGain != null && totalSwap != null
+      ? (isPaying ? maxGain - totalSwap : maxGain + totalSwap) : null;
+    const daysUntil  = maxGain != null && dailyCost && isPaying
+      ? Math.floor(maxGain / dailyCost) : null;
+
+    let html = "";
+    if (dailyCost != null) {
+      html += rowS(dailyLabel,
+        isPaying ? `-${fmt(dailyCost, curSym)}` : `+${fmt(dailyCost, curSym)}`,
+        isPaying ? "#e8445a" : "#00d4aa",
+        `${lots} lots`);
+    }
+    if (totalSwap != null) {
+      html += rowS(`TOTAL SWAP (${daysHeld}d)`,
+        isPaying ? `-${fmt(totalSwap, curSym)}` : `+${fmt(totalSwap, curSym)}`,
+        isPaying ? "#e8445a" : "#00d4aa");
+    }
+    if (gainAfter != null) {
+      const gc = gainAfter >= 0 ? "#00d4aa" : "#e8445a";
+      html += rowS(`ADJ. GAIN AFTER ${daysHeld}d`,
+        gainAfter >= 0 ? fmt(gainAfter, curSym) : `-${fmt(Math.abs(gainAfter), curSym)}`, gc);
+    }
+    if (daysUntil != null) {
+      const dc = daysUntil <= 3 ? "#e8445a" : daysUntil <= 7 ? "#f5a623" : "#8a909c";
+      html += rowS("DAYS BEFORE UNPROFITABLE", `${daysUntil} days`, dc, "swap eats profit");
+    } else if (!isPaying && dailyCost != null) {
+      html += rowS("SWAP EFFECT", "CREDIT — adds to profit", "#00d4aa");
+    }
+    res.innerHTML = html || `<div style="padding:12px 0;color:#3a3f4a;font-size:11px;text-align:center;">Fill in trade fields first.</div>`;
+
+  } else {
+    // Stocks mode
+    const shares   = r.shares;
+    const entry    = toNum(calcFields.entry);
+    const maxGain  = r.maxGain;
+    const curSym   = CURRENCIES[calcCur];
+    const finRate  = toNum(swapFields.finRate);
+
+    if (!finRate) { empty("Enter annual financing rate above."); return; }
+
+    const posSize    = shares && entry ? shares * entry : null;
+    const dailyCost  = posSize ? posSize * finRate / 100 / 365 : null;
+    const daysHeld   = toNum(swapFields.daysS);
+    const totalCost  = dailyCost && daysHeld > 0 ? dailyCost * daysHeld : null;
+    const gainAfter  = maxGain != null && totalCost != null ? maxGain - totalCost : null;
+    const daysUntil  = maxGain != null && dailyCost ? Math.floor(maxGain / dailyCost) : null;
+
+    let html = "";
+    if (dailyCost != null) html += rowS("DAILY FINANCING COST", `-${fmt(dailyCost, curSym)}`, "#e8445a", `${finRate}%/yr`);
+    if (totalCost != null) html += rowS(`TOTAL COST (${daysHeld}d)`, `-${fmt(totalCost, curSym)}`, "#e8445a");
+    if (gainAfter != null) {
+      const gc = gainAfter >= 0 ? "#00d4aa" : "#e8445a";
+      html += rowS(`ADJ. GAIN AFTER ${daysHeld}d`,
+        gainAfter >= 0 ? fmt(gainAfter, curSym) : `-${fmt(Math.abs(gainAfter), curSym)}`, gc);
+    }
+    if (daysUntil != null) {
+      const dc = daysUntil <= 5 ? "#e8445a" : daysUntil <= 14 ? "#f5a623" : "#8a909c";
+      html += rowS("DAYS BEFORE UNPROFITABLE", `${daysUntil} days`, dc, "financing eats profit");
+    }
+    res.innerHTML = html || `<div style="padding:12px 0;color:#3a3f4a;font-size:11px;text-align:center;">Fill in trade fields first.</div>`;
+  }
 }
 
 $("log-trade-btn").onclick = () => {
