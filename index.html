@@ -329,8 +329,8 @@
         <div id="swap-body" style="display:none;padding:0 16px 16px;border-top:1px solid #1a1d24;">
           <div id="swap-cfd-inputs">
             <div class="grid2" style="margin:14px 0 12px;">
-              <div><label class="label">LONG SWAP ($/lot/night)</label><input class="input" id="sw-long" inputmode="decimal" placeholder="e.g. -5.00" /></div>
-              <div><label class="label">SHORT SWAP ($/lot/night)</label><input class="input" id="sw-short" inputmode="decimal" placeholder="e.g. 3.00" /></div>
+              <div><label class="label">LONG SWAP (%/year)</label><input class="input" id="sw-long" inputmode="decimal" placeholder="e.g. -6.0" /></div>
+              <div><label class="label">SHORT SWAP (%/year)</label><input class="input" id="sw-short" inputmode="decimal" placeholder="e.g. 1.1" /></div>
               <div><label class="label">DAYS TO HOLD</label><input class="input" id="sw-days" inputmode="decimal" placeholder="optional" /></div>
             </div>
           </div>
@@ -1029,8 +1029,8 @@ function buildCalc() {
           <div><div style="color:#4a5060;font-size:9px;letter-spacing:.08em;">POINT SIZE</div><div style="color:#8a909c;font-size:11px;margin-top:2px;">${instSym.pointSize}</div></div>
           <div><div style="color:#4a5060;font-size:9px;letter-spacing:.08em;">POINT VALUE</div><div style="color:#8a909c;font-size:11px;margin-top:2px;">${instSym.pointValue} ${instSym.currency}/lot</div></div>
           <div><div style="color:#4a5060;font-size:9px;letter-spacing:.08em;">MIN LOT</div><div style="color:#8a909c;font-size:11px;margin-top:2px;">${instSym.minLot}</div></div>
-          ${instSym.swapLong  != null ? `<div><div style="color:#4a5060;font-size:9px;letter-spacing:.08em;">SWAP LONG</div><div style="color:${instSym.swapLong<0?'#e8445a':'#00d4aa'};font-size:11px;margin-top:2px;">${instSym.swapLong}/lot</div></div>` : ''}
-          ${instSym.swapShort != null ? `<div><div style="color:#4a5060;font-size:9px;letter-spacing:.08em;">SWAP SHORT</div><div style="color:${instSym.swapShort<0?'#e8445a':'#00d4aa'};font-size:11px;margin-top:2px;">${instSym.swapShort}/lot</div></div>` : ''}
+          ${instSym.swapLong  != null ? `<div><div style="color:#4a5060;font-size:9px;letter-spacing:.08em;">SWAP LONG</div><div style="color:${instSym.swapLong<0?'#e8445a':'#00d4aa'};font-size:11px;margin-top:2px;">${instSym.swapLong}%/yr</div></div>` : ''}
+          ${instSym.swapShort != null ? `<div><div style="color:#4a5060;font-size:9px;letter-spacing:.08em;">SWAP SHORT</div><div style="color:${instSym.swapShort<0?'#e8445a':'#00d4aa'};font-size:11px;margin-top:2px;">${instSym.swapShort}%/yr</div></div>` : ''}
         </div>
       </div>`;
 
@@ -1066,12 +1066,12 @@ function buildCalc() {
               <input class="input" id="edit-sym-currency" value="${instSym.currency}" />
             </div>
             <div>
-              <label class="label">LONG SWAP ($/lot/night)</label>
-              <input class="input" id="edit-sym-swaplong" inputmode="decimal" value="${instSym.swapLong != null ? instSym.swapLong : ''}" placeholder="e.g. -5.00" />
+              <label class="label">LONG SWAP (%/year)</label>
+              <input class="input" id="edit-sym-swaplong" inputmode="decimal" value="${instSym.swapLong != null ? instSym.swapLong : ''}" placeholder="e.g. -6.0" />
             </div>
             <div>
-              <label class="label">SHORT SWAP ($/lot/night)</label>
-              <input class="input" id="edit-sym-swapshort" inputmode="decimal" value="${instSym.swapShort != null ? instSym.swapShort : ''}" placeholder="e.g. 3.00" />
+              <label class="label">SHORT SWAP (%/year)</label>
+              <input class="input" id="edit-sym-swapshort" inputmode="decimal" value="${instSym.swapShort != null ? instSym.swapShort : ''}" placeholder="e.g. 1.1" />
             </div>
           </div>
           <div style="display:flex;gap:8px;">
@@ -1333,21 +1333,29 @@ function computeSwap() {
     const rateStr  = calcDir === "long" ? swapFields.long : swapFields.short;
     const swapRate = parseFloat(rateStr);
 
-    if (isNaN(swapRate)) { empty("Enter swap rate above to calculate holding cost."); return; }
+    if (isNaN(swapRate)) { empty("Enter annual swap rate (%) above."); return; }
     if (swapRate === 0)  { empty("No daily swap cost — holding is free for this direction."); return; }
 
-    const isPaying   = swapRate < 0;
-    const dailyCost  = lots ? Math.abs(swapRate * lots) : null;
-    const dailyLabel = isPaying ? "DAILY SWAP COST" : "DAILY SWAP CREDIT";
-    const daysHeld   = toNum(swapFields.days);
-    const totalSwap  = dailyCost && daysHeld > 0 ? dailyCost * daysHeld : null;
-    const gainAfter  = maxGain != null && totalSwap != null
+    // Notional per lot = (entry / pointSize) × pointValue
+    const inst           = inst2sym(cfdSymbolId);
+    const entry          = toNum(cfdFields.entry);
+    const notionalPerLot = entry > 0 ? (entry / inst.pointSize) * inst.pointValue : null;
+    const isPaying       = swapRate < 0;
+    const dailyCost      = lots && notionalPerLot
+      ? lots * notionalPerLot * Math.abs(swapRate) / 100 / 360 : null;
+    const dailyLabel     = isPaying ? "DAILY SWAP COST" : "DAILY SWAP CREDIT";
+    const daysHeld       = toNum(swapFields.days);
+    const totalSwap      = dailyCost && daysHeld > 0 ? dailyCost * daysHeld : null;
+    const gainAfter      = maxGain != null && totalSwap != null
       ? (isPaying ? maxGain - totalSwap : maxGain + totalSwap) : null;
-    const daysUntil  = maxGain != null && dailyCost && isPaying
+    const daysUntil      = maxGain != null && dailyCost && isPaying
       ? Math.floor(maxGain / dailyCost) : null;
 
     let html = "";
-    if (dailyCost != null) {
+    html += rowS("ANNUAL RATE", `${swapRate}%`, isPaying ? "#e8445a" : "#00d4aa", calcDir + " position");
+    if (!notionalPerLot) {
+      html += `<div style="padding:8px 0 4px;color:#3a3f4a;font-size:11px;">Enter entry price to calculate daily cost.</div>`;
+    } else if (dailyCost != null) {
       html += rowS(dailyLabel,
         isPaying ? `-${fmt(dailyCost, curSym)}` : `+${fmt(dailyCost, curSym)}`,
         isPaying ? "#e8445a" : "#00d4aa",
