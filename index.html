@@ -347,6 +347,7 @@
       <div id="calc-banner" style="display:none;"></div>
       <div id="heat-banner" style="display:none;"></div>
 
+      <div id="pretrade-summary" style="display:none;margin-bottom:16px;"></div>
       <div class="flex-gap8">
         <button class="btn-green" id="log-trade-btn">+ LOG THIS TRADE</button>
         <button class="btn" id="clear-trade-btn">↺ CLEAR TRADE</button>
@@ -357,6 +358,7 @@
     <div class="tab-panel" id="tab-log">
       <div id="stat-grid-wrap" style="display:none;">
         <div class="stat-grid" id="stat-grid"></div>
+        <div class="stat-grid" id="pnl-stat-grid" style="display:none;margin-top:8px;"></div>
       </div>
       <div id="log-saving" class="saving" style="display:none;margin-bottom:12px;">Saving…</div>
       <div id="trades-list"></div>
@@ -1252,6 +1254,7 @@ function computeCalc() {
   else{hb.style.display="none";}
 
   window._calcResult = { mode:"stocks", sym, entry:calcFields.entry, stop:calcFields.stop, target:calcFields.target, shares, maxLoss, maxGain, rrRatio };
+  renderPreTradeSummary();
   computeSwap();
 }
 
@@ -1332,7 +1335,97 @@ function computeCFD() {
   else{hb.style.display="none";}
 
   window._calcResult = { mode:"cfd", sym:curSym, instrument:inst.label, entry:cfdFields.entry, stop:cfdFields.stop, target:cfdFields.target, lots, stopPips, targetPips, maxLoss, maxGain, rrRatio };
+  renderPreTradeSummary();
   computeSwap();
+}
+
+function countWednesdays(days) {
+  let n = 0;
+  const d = new Date();
+  for (let i = 0; i < days; i++) {
+    const day = new Date(d); day.setDate(d.getDate() + i);
+    if (day.getDay() === 3) n++;
+  }
+  return n;
+}
+
+function totalSwapForDays(dailyCost, days) {
+  let total = 0;
+  const d = new Date();
+  for (let i = 0; i < days; i++) {
+    const day = new Date(d); day.setDate(d.getDate() + i);
+    total += dailyCost * (day.getDay() === 3 ? 3 : 1);
+  }
+  return total;
+}
+
+function swapBreakevenDays(dailyCost, maxGain) {
+  if (!dailyCost || !maxGain) return null;
+  let total = 0;
+  const d = new Date();
+  for (let i = 0; i < 365; i++) {
+    const day = new Date(d); day.setDate(d.getDate() + i);
+    total += dailyCost * (day.getDay() === 3 ? 3 : 1);
+    if (total >= maxGain) return i + 1;
+  }
+  return null;
+}
+
+function calcTradePnL(t) {
+  if (!t.exitPrice || !t.entry || !t.stop || t.maxLoss == null) return null;
+  const exit  = parseFloat(t.exitPrice);
+  const entry = parseFloat(t.entry);
+  const stop  = parseFloat(t.stop);
+  if (isNaN(exit) || isNaN(entry) || isNaN(stop)) return null;
+  const stopDist = Math.abs(entry - stop);
+  if (!stopDist) return null;
+  const exitMove = t.dir === "long" ? (exit - entry) : (entry - exit);
+  return +(exitMove / stopDist * Math.abs(t.maxLoss)).toFixed(2);
+}
+
+function renderPreTradeSummary() {
+  const el = $("pretrade-summary");
+  if (!el) return;
+  const r   = window._calcResult || {};
+  const { maxLoss, maxGain, rrRatio } = r;
+  const swapDays = window._swapBreakevenDays;
+
+  const hasData = rrRatio != null || maxLoss != null;
+  if (!hasData) { el.style.display = "none"; return; }
+
+  const riskPct = calcMode === "stocks" ? toNum(calcFields.riskPct) : toNum(cfdFields.riskPct);
+  const inst    = calcMode === "cfd" ? inst2sym(cfdSymbolId) : null;
+  const dirStr  = calcDir === "long" ? "▲ LONG" : "▼ SHORT";
+  const modeStr = calcMode === "cfd" ? inst.label : "STOCKS";
+  const sym     = CURRENCIES[calcCur];
+
+  const issues = [], warnings = [];
+  if (rrRatio != null && rrRatio < 1.5)                          issues.push(`R:R ${rrRatio.toFixed(1)}R is low`);
+  else if (rrRatio != null && rrRatio < 2)                       warnings.push(`R:R ${rrRatio.toFixed(1)}R marginal`);
+  if (swapDays != null && swapDays <= 3)                         issues.push(`swap kills trade in ${swapDays}d`);
+  else if (swapDays != null && swapDays <= 7)                    warnings.push(`swap safe only ${swapDays}d`);
+
+  const color = issues.length ? "#e8445a" : warnings.length ? "#f5a623" : "#00d4aa";
+
+  const parts = [];
+  if (rrRatio != null && !issues.find(s=>s.includes("R:R")) && !warnings.find(s=>s.includes("R:R"))) parts.push(`R:R ${rrRatio.toFixed(1)}R`);
+  if (riskPct)            parts.push(`Risk ${riskPct}%`);
+  if (maxLoss != null)    parts.push(`Max loss ${sym}${Math.abs(maxLoss).toFixed(0)}`);
+  if (maxGain != null)    parts.push(`Max gain ${sym}${maxGain.toFixed(0)}`);
+  if (swapDays != null && !issues.find(s=>s.includes("swap")) && !warnings.find(s=>s.includes("swap"))) parts.push(`Swap safe ${swapDays}d`);
+
+  const alerts = [...issues, ...warnings];
+  el.style.display = "block";
+  el.innerHTML = `
+    <div style="background:${color}0e;border:1px solid ${color}44;border-radius:8px;padding:12px 16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:${alerts.length?'8px':'0'};">
+        <span style="color:${color};font-size:11px;font-weight:600;letter-spacing:.08em;">${dirStr} · ${modeStr}</span>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          ${parts.map(p=>`<span style="color:#8a909c;font-size:11px;">${p}</span>`).join('')}
+        </div>
+      </div>
+      ${alerts.length ? `<div style="color:${color};font-size:10px;letter-spacing:.04em;">⚠ ${alerts.join(' · ')}</div>` : ''}
+    </div>`;
 }
 
 function computeSwap() {
@@ -1350,14 +1443,15 @@ function computeSwap() {
     const rateStr  = calcDir === "long" ? swapFields.long : swapFields.short;
     const swapRate = parseFloat(rateStr);
 
-    if (isNaN(swapRate)) { empty("Enter swap rate above."); return; }
-    if (swapRate === 0)  { empty("No daily swap cost — holding is free for this direction."); return; }
+    if (isNaN(swapRate)) { empty("Enter swap rate above."); window._swapBreakevenDays = null; renderPreTradeSummary(); return; }
+    if (swapRate === 0)  { empty("No daily swap cost — holding is free."); window._swapBreakevenDays = null; renderPreTradeSummary(); return; }
 
-    const inst     = inst2sym(cfdSymbolId);
-    const swapType = inst.swapType || "pct";
-    const entry    = toNum(cfdFields.entry);
-    const isPaying = swapRate < 0;
-    let dailyCost  = null;
+    const inst        = inst2sym(cfdSymbolId);
+    const swapType    = inst.swapType || "pct";
+    const entry       = toNum(cfdFields.entry);
+    const maxLoss     = r.maxLoss;
+    const isPaying    = swapRate < 0;
+    let   dailyCost   = null;
 
     if (swapType === "pct") {
       const notionalPerLot = entry > 0 ? (entry / inst.pointSize) * inst.pointValue : null;
@@ -1366,31 +1460,40 @@ function computeSwap() {
       dailyCost = lots ? lots * Math.abs(swapRate) : null;
     }
 
-    const dailyLabel = isPaying ? "DAILY SWAP COST" : "DAILY SWAP CREDIT";
-    const daysHeld   = toNum(swapFields.days);
-    const totalSwap  = dailyCost && daysHeld > 0 ? dailyCost * daysHeld : null;
-    const gainAfter  = maxGain != null && totalSwap != null
+    const dailyCostInR = dailyCost && maxLoss ? dailyCost / Math.abs(maxLoss) : null;
+    const dailyLabel   = isPaying ? "DAILY SWAP COST" : "DAILY SWAP CREDIT";
+    const daysHeld     = toNum(swapFields.days);
+    const wedCount     = daysHeld > 0 ? countWednesdays(daysHeld) : 0;
+    const totalSwap    = dailyCost && daysHeld > 0 ? totalSwapForDays(dailyCost, daysHeld) : null;
+    const gainAfter    = maxGain != null && totalSwap != null
       ? (isPaying ? maxGain - totalSwap : maxGain + totalSwap) : null;
-    const daysUntil  = maxGain != null && dailyCost && isPaying
-      ? Math.floor(maxGain / dailyCost) : null;
+    const daysUntil    = maxGain != null && dailyCost && isPaying
+      ? swapBreakevenDays(dailyCost, maxGain) : null;
+    window._swapBreakevenDays = isPaying ? daysUntil : null;
 
     let html = "";
     const rateLabel = swapType === "pct" ? "ANNUAL RATE" : "RATE/LOT/NIGHT";
     const rateVal   = swapType === "pct" ? `${swapRate}%` : `${swapRate > 0 ? "+" : ""}${swapRate} $`;
     html += rowS(rateLabel, rateVal, isPaying ? "#e8445a" : "#00d4aa", calcDir + " position");
+
     if (swapType === "pct" && entry <= 0) {
       html += `<div style="padding:8px 0 4px;color:#3a3f4a;font-size:11px;">Enter entry price to calculate daily cost.</div>`;
     } else if (dailyCost != null) {
       html += rowS(dailyLabel,
         isPaying ? `-${fmt(dailyCost, curSym)}` : `+${fmt(dailyCost, curSym)}`,
-        isPaying ? "#e8445a" : "#00d4aa",
-        `${lots} lots`);
+        isPaying ? "#e8445a" : "#00d4aa", `${lots} lots`);
+      if (dailyCostInR != null && isPaying)
+        html += rowS("DAILY COST IN R", `${dailyCostInR.toFixed(3)}R`, "#f5a623", "per night");
     }
-    if (totalSwap != null) {
+
+    if (wedCount > 0 && daysHeld > 0 && isPaying)
+      html += `<div style="background:#f5a62318;border:1px solid #f5a62344;border-radius:6px;padding:8px 12px;margin:4px 0;color:#f5a623;font-size:11px;letter-spacing:.04em;">⚠ ${wedCount} Wednesday${wedCount>1?'s':''} in hold period — triple swap included.</div>`;
+
+    if (totalSwap != null)
       html += rowS(`TOTAL SWAP (${daysHeld}d)`,
         isPaying ? `-${fmt(totalSwap, curSym)}` : `+${fmt(totalSwap, curSym)}`,
-        isPaying ? "#e8445a" : "#00d4aa");
-    }
+        isPaying ? "#e8445a" : "#00d4aa", wedCount > 0 ? "incl. triple swap" : "");
+
     if (gainAfter != null) {
       const gc = gainAfter >= 0 ? "#00d4aa" : "#e8445a";
       html += rowS(`ADJ. GAIN AFTER ${daysHeld}d`,
@@ -1398,11 +1501,12 @@ function computeSwap() {
     }
     if (daysUntil != null) {
       const dc = daysUntil <= 3 ? "#e8445a" : daysUntil <= 7 ? "#f5a623" : "#8a909c";
-      html += rowS("DAYS BEFORE UNPROFITABLE", `${daysUntil} days`, dc, "swap eats profit");
+      html += rowS("DAYS BEFORE UNPROFITABLE", `${daysUntil} days`, dc, "incl. Wed triple swap");
     } else if (!isPaying && dailyCost != null) {
       html += rowS("SWAP EFFECT", "CREDIT — adds to profit", "#00d4aa");
     }
     res.innerHTML = html || `<div style="padding:12px 0;color:#3a3f4a;font-size:11px;text-align:center;">Fill in trade fields first.</div>`;
+    renderPreTradeSummary();
 
   } else {
     // Stocks mode
@@ -1412,17 +1516,23 @@ function computeSwap() {
     const curSym   = CURRENCIES[calcCur];
     const finRate  = toNum(swapFields.finRate);
 
-    if (!finRate) { empty("Enter annual financing rate above."); return; }
+    if (!finRate) { empty("Enter annual financing rate above."); window._swapBreakevenDays = null; renderPreTradeSummary(); return; }
 
-    const posSize    = shares && entry ? shares * entry : null;
-    const dailyCost  = posSize ? posSize * finRate / 100 / 365 : null;
-    const daysHeld   = toNum(swapFields.daysS);
-    const totalCost  = dailyCost && daysHeld > 0 ? dailyCost * daysHeld : null;
-    const gainAfter  = maxGain != null && totalCost != null ? maxGain - totalCost : null;
-    const daysUntil  = maxGain != null && dailyCost ? Math.floor(maxGain / dailyCost) : null;
+    const posSize       = shares && entry ? shares * entry : null;
+    const dailyCost     = posSize ? posSize * finRate / 100 / 365 : null;
+    const dailyCostInR  = dailyCost && maxGain ? dailyCost / Math.abs(r.maxLoss || 1) : null;
+    const daysHeld      = toNum(swapFields.daysS);
+    const totalCost     = dailyCost && daysHeld > 0 ? dailyCost * daysHeld : null;
+    const gainAfter     = maxGain != null && totalCost != null ? maxGain - totalCost : null;
+    const daysUntil     = maxGain != null && dailyCost ? Math.floor(maxGain / dailyCost) : null;
+    window._swapBreakevenDays = daysUntil;
 
     let html = "";
-    if (dailyCost != null) html += rowS("DAILY FINANCING COST", `-${fmt(dailyCost, curSym)}`, "#e8445a", `${finRate}%/yr`);
+    if (dailyCost != null) {
+      html += rowS("DAILY FINANCING COST", `-${fmt(dailyCost, curSym)}`, "#e8445a", `${finRate}%/yr`);
+      if (dailyCostInR != null && r.maxLoss)
+        html += rowS("DAILY COST IN R", `${dailyCostInR.toFixed(3)}R`, "#f5a623", "per day");
+    }
     if (totalCost != null) html += rowS(`TOTAL COST (${daysHeld}d)`, `-${fmt(totalCost, curSym)}`, "#e8445a");
     if (gainAfter != null) {
       const gc = gainAfter >= 0 ? "#00d4aa" : "#e8445a";
@@ -1434,6 +1544,7 @@ function computeSwap() {
       html += rowS("DAYS BEFORE UNPROFITABLE", `${daysUntil} days`, dc, "financing eats profit");
     }
     res.innerHTML = html || `<div style="padding:12px 0;color:#3a3f4a;font-size:11px;text-align:center;">Fill in trade fields first.</div>`;
+    renderPreTradeSummary();
   }
 }
 
@@ -1478,6 +1589,17 @@ function renderLog() {
   const discArr = trades.filter(t=>t.discipline);
   const avgDisc = discArr.length ? (discArr.reduce((a,t)=>a+(parseFloat(t.discipline)||0),0)/discArr.length).toFixed(1) : null;
 
+  // P&L stats
+  const pnlTrades = trades.filter(t=>t.pnl!=null);
+  const totalPnl  = pnlTrades.reduce((a,t)=>a+t.pnl,0);
+  const winPnls   = pnlTrades.filter(t=>t.pnl>0);
+  const lossPnls  = pnlTrades.filter(t=>t.pnl<0);
+  const avgWin    = winPnls.length  ? winPnls.reduce((a,t)=>a+t.pnl,0)/winPnls.length   : null;
+  const avgLoss   = lossPnls.length ? Math.abs(lossPnls.reduce((a,t)=>a+t.pnl,0)/lossPnls.length) : null;
+  const expectancy = avgWin && avgLoss
+    ? (winPnls.length/pnlTrades.length)*avgWin - (lossPnls.length/pnlTrades.length)*avgLoss : null;
+  const pnlCur = trades.length ? (CURRENCIES[trades[0].cur]||"$") : "$";
+
   // Badge
   const badge = $("log-badge");
   badge.textContent = trades.length;
@@ -1493,6 +1615,17 @@ function renderLog() {
       {l:"LOSSES",v:losses,c:"#e8445a"},
       {l:"AVG DISC",v:avgDisc?`${avgDisc}/10`:"—",c:"#a78bfa"},
     ].map(s=>`<div class="stat-box"><div class="stat-val" style="color:${s.c};">${s.v}</div><div class="stat-lbl">${s.l}</div></div>`).join("");
+
+    const pg = $("pnl-stat-grid");
+    if (pnlTrades.length > 0) {
+      pg.style.display = "grid";
+      pg.innerHTML = [
+        {l:"TOTAL P&L",  v:(totalPnl>=0?"+":"")+pnlCur+Math.abs(totalPnl).toFixed(0), c:totalPnl>=0?"#00d4aa":"#e8445a"},
+        {l:"AVG WIN",    v:avgWin  ? "+"+pnlCur+avgWin.toFixed(0)  : "—", c:"#00d4aa"},
+        {l:"AVG LOSS",   v:avgLoss ? "-"+pnlCur+avgLoss.toFixed(0) : "—", c:"#e8445a"},
+        {l:"EXPECTANCY", v:expectancy!=null?(expectancy>=0?"+":"")+pnlCur+Math.abs(expectancy).toFixed(0):"—", c:expectancy==null?"#8a909c":expectancy>=0?"#00d4aa":"#e8445a"},
+      ].map(s=>`<div class="stat-box"><div class="stat-val" style="color:${s.c};font-size:15px;">${s.v}</div><div class="stat-lbl">${s.l}</div></div>`).join("");
+    } else { pg.style.display = "none"; }
   } else { sg.style.display = "none"; }
 
   // Trades list
@@ -1537,6 +1670,7 @@ function renderLog() {
             </div>` : `
             <div class="close-grid" style="margin-top:0;">
               ${t.exitPrice ? `<div class="trade-num-box"><div class="trade-num-lbl">EXIT</div><div class="trade-num-val">${sym(t)}${t.exitPrice}</div></div>` : ""}
+              ${t.pnl!=null ? `<div class="trade-num-box"><div class="trade-num-lbl">P&amp;L</div><div class="trade-num-val" style="color:${t.pnl>=0?'#00d4aa':'#e8445a'};">${t.pnl>=0?'+':''}${sym(t)}${Math.abs(t.pnl).toFixed(2)}</div></div>` : ""}
               ${t.discipline ? `<div class="trade-num-box"><div class="trade-num-lbl">DISCIPLINE</div><div class="trade-num-val" style="color:#a78bfa;">${t.discipline}/10</div></div>` : ""}
               ${t.notes ? `<div class="trade-num-box" style="grid-column:1/-1;"><div class="trade-num-lbl" style="margin-bottom:4px;">NOTES</div><div style="color:#8a909c;font-size:11px;line-height:1.5;">${t.notes}</div></div>` : ""}
             </div>`}
@@ -1578,6 +1712,7 @@ window.saveCloseForm = i => {
   trades[i].result     = $(`cl-result-${i}`).value;
   trades[i].discipline = $(`cl-disc-${i}`).value;
   trades[i].notes      = $(`cl-notes-${i}`).value;
+  trades[i].pnl        = calcTradePnL(trades[i]);
   saveTrades(); renderLog();
 };
 
