@@ -329,8 +329,8 @@
         <div id="swap-body" style="display:none;padding:0 16px 16px;border-top:1px solid #1a1d24;">
           <div id="swap-cfd-inputs">
             <div class="grid2" style="margin:14px 0 12px;">
-              <div><label class="label">LONG SWAP (%/year)</label><input class="input" id="sw-long" inputmode="decimal" placeholder="e.g. -6.0" /></div>
-              <div><label class="label">SHORT SWAP (%/year)</label><input class="input" id="sw-short" inputmode="decimal" placeholder="e.g. 1.1" /></div>
+              <div><label class="label" id="lbl-sw-long">LONG SWAP (%/year)</label><input class="input" id="sw-long" inputmode="decimal" placeholder="e.g. -6.0" /></div>
+              <div><label class="label" id="lbl-sw-short">SHORT SWAP (%/year)</label><input class="input" id="sw-short" inputmode="decimal" placeholder="e.g. 1.1" /></div>
               <div><label class="label">DAYS TO HOLD</label><input class="input" id="sw-days" inputmode="decimal" placeholder="optional" /></div>
             </div>
           </div>
@@ -718,38 +718,38 @@ function buildPanicTimer() {
 // minLot / lotStep for display only
 const SYMBOLS = [
   // ── US Indices ──
-  { id:"NAS100",  cat:"Indices", flag:"🇺🇸", label:"NAS100",   full:"Nasdaq 100",          contractSize:100,  pointSize:1,      pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.9 pts"  },
-  { id:"US500",   cat:"Indices", flag:"🇺🇸", label:"US500",    full:"S&P 500",             contractSize:100,  pointSize:0.1,    pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.4 pts"  },
-  { id:"US30",    cat:"Indices", flag:"🇺🇸", label:"US30",     full:"Dow Jones 30",        contractSize:100,  pointSize:1,      pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"2.4 pts"  },
-  { id:"US2000",  cat:"Indices", flag:"🇺🇸", label:"US2000",   full:"Russell 2000",        contractSize:100,  pointSize:0.1,    pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.5 pts"  },
+  { id:"NAS100",  cat:"Indices", flag:"🇺🇸", label:"NAS100",   full:"Nasdaq 100",          contractSize:100,  pointSize:1,      pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.9 pts",  swapType:"pct"     },
+  { id:"US500",   cat:"Indices", flag:"🇺🇸", label:"US500",    full:"S&P 500",             contractSize:100,  pointSize:0.1,    pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.4 pts",  swapType:"pct"     },
+  { id:"US30",    cat:"Indices", flag:"🇺🇸", label:"US30",     full:"Dow Jones 30",        contractSize:100,  pointSize:1,      pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"2.4 pts",  swapType:"pct"     },
+  { id:"US2000",  cat:"Indices", flag:"🇺🇸", label:"US2000",   full:"Russell 2000",        contractSize:100,  pointSize:0.1,    pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.5 pts",  swapType:"pct"     },
   // ── European Indices ──
-  { id:"GER40",   cat:"Indices", flag:"🇩🇪", label:"GER40",    full:"Germany 40 (DAX)",    contractSize:25,   pointSize:1,      pointValue:1,      currency:"EUR", minLot:0.01, lotStep:0.01, spread:"1.2 pts"  },
-  { id:"UK100",   cat:"Indices", flag:"🇬🇧", label:"UK100",    full:"FTSE 100",            contractSize:10,   pointSize:1,      pointValue:1,      currency:"GBP", minLot:0.01, lotStep:0.01, spread:"1.0 pts"  },
-  { id:"FRA40",   cat:"Indices", flag:"🇫🇷", label:"FRA40",    full:"CAC 40",              contractSize:10,   pointSize:1,      pointValue:1,      currency:"EUR", minLot:0.01, lotStep:0.01, spread:"1.5 pts"  },
-  { id:"EUSTX50", cat:"Indices", flag:"🇪🇺", label:"EUSTX50",  full:"Euro Stoxx 50",       contractSize:10,   pointSize:1,      pointValue:1,      currency:"EUR", minLot:0.01, lotStep:0.01, spread:"2.0 pts"  },
-  { id:"SWI20",   cat:"Indices", flag:"🇨🇭", label:"SWI20",    full:"Swiss Market Index",  contractSize:10,   pointSize:1,      pointValue:1,      currency:"CHF", minLot:0.01, lotStep:0.01, spread:"5.0 pts"  },
-  { id:"NED25",   cat:"Indices", flag:"🇳🇱", label:"NED25",    full:"AEX Netherlands 25",  contractSize:200,  pointSize:0.01,   pointValue:2,      currency:"EUR", minLot:0.01, lotStep:0.01, spread:"0.3 pts"  },
+  { id:"GER40",   cat:"Indices", flag:"🇩🇪", label:"GER40",    full:"Germany 40 (DAX)",    contractSize:25,   pointSize:1,      pointValue:1,      currency:"EUR", minLot:0.01, lotStep:0.01, spread:"1.2 pts",  swapType:"pct"     },
+  { id:"UK100",   cat:"Indices", flag:"🇬🇧", label:"UK100",    full:"FTSE 100",            contractSize:10,   pointSize:1,      pointValue:1,      currency:"GBP", minLot:0.01, lotStep:0.01, spread:"1.0 pts",  swapType:"pct"     },
+  { id:"FRA40",   cat:"Indices", flag:"🇫🇷", label:"FRA40",    full:"CAC 40",              contractSize:10,   pointSize:1,      pointValue:1,      currency:"EUR", minLot:0.01, lotStep:0.01, spread:"1.5 pts",  swapType:"pct"     },
+  { id:"EUSTX50", cat:"Indices", flag:"🇪🇺", label:"EUSTX50",  full:"Euro Stoxx 50",       contractSize:10,   pointSize:1,      pointValue:1,      currency:"EUR", minLot:0.01, lotStep:0.01, spread:"2.0 pts",  swapType:"pct"     },
+  { id:"SWI20",   cat:"Indices", flag:"🇨🇭", label:"SWI20",    full:"Swiss Market Index",  contractSize:10,   pointSize:1,      pointValue:1,      currency:"CHF", minLot:0.01, lotStep:0.01, spread:"5.0 pts",  swapType:"pct"     },
+  { id:"NED25",   cat:"Indices", flag:"🇳🇱", label:"NED25",    full:"AEX Netherlands 25",  contractSize:200,  pointSize:0.01,   pointValue:2,      currency:"EUR", minLot:0.01, lotStep:0.01, spread:"0.3 pts",  swapType:"pct"     },
   // ── Asian / Pacific Indices ──
-  { id:"AUS200",  cat:"Indices", flag:"🇦🇺", label:"AUS200",   full:"Australia 200",       contractSize:25,   pointSize:1,      pointValue:1,      currency:"AUD", minLot:0.01, lotStep:0.01, spread:"1.0 pts"  },
-  { id:"JPN225",  cat:"Indices", flag:"🇯🇵", label:"JPN225",   full:"Japan 225",           contractSize:100,  pointSize:1,      pointValue:1,      currency:"JPY", minLot:0.01, lotStep:0.01, spread:"6.0 pts"  },
-  { id:"HK50",    cat:"Indices", flag:"🇭🇰", label:"HK50",     full:"Hang Seng 50",        contractSize:50,   pointSize:1,      pointValue:1,      currency:"HKD", minLot:0.01, lotStep:0.01, spread:"8.0 pts"  },
-  { id:"CHINAH",  cat:"Indices", flag:"🇨🇳", label:"CHINAH",   full:"China H-Shares",      contractSize:50,   pointSize:1,      pointValue:1,      currency:"HKD", minLot:0.01, lotStep:0.01, spread:"10 pts"   },
-  { id:"SING30",  cat:"Indices", flag:"🇸🇬", label:"SING30",   full:"Singapore 30",        contractSize:200,  pointSize:0.1,    pointValue:1,       currency:"SGD", minLot:0.01, lotStep:0.01, spread:"0.6 pts"  },
+  { id:"AUS200",  cat:"Indices", flag:"🇦🇺", label:"AUS200",   full:"Australia 200",       contractSize:25,   pointSize:1,      pointValue:1,      currency:"AUD", minLot:0.01, lotStep:0.01, spread:"1.0 pts",  swapType:"pct"     },
+  { id:"JPN225",  cat:"Indices", flag:"🇯🇵", label:"JPN225",   full:"Japan 225",           contractSize:100,  pointSize:1,      pointValue:1,      currency:"JPY", minLot:0.01, lotStep:0.01, spread:"6.0 pts",  swapType:"pct"     },
+  { id:"HK50",    cat:"Indices", flag:"🇭🇰", label:"HK50",     full:"Hang Seng 50",        contractSize:50,   pointSize:1,      pointValue:1,      currency:"HKD", minLot:0.01, lotStep:0.01, spread:"8.0 pts",  swapType:"pct"     },
+  { id:"CHINAH",  cat:"Indices", flag:"🇨🇳", label:"CHINAH",   full:"China H-Shares",      contractSize:50,   pointSize:1,      pointValue:1,      currency:"HKD", minLot:0.01, lotStep:0.01, spread:"10 pts",   swapType:"pct"     },
+  { id:"SING30",  cat:"Indices", flag:"🇸🇬", label:"SING30",   full:"Singapore 30",        contractSize:200,  pointSize:0.1,    pointValue:1,       currency:"SGD", minLot:0.01, lotStep:0.01, spread:"0.6 pts",  swapType:"pct"     },
   // ── Metals ──
-  { id:"XAUUSD",  cat:"Metals",  flag:"🥇", label:"XAUUSD",   full:"Gold vs USD",         contractSize:100,  pointSize:0.01,   pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.1 pts"  },
-  { id:"XAGUSD",  cat:"Metals",  flag:"🥈", label:"XAGUSD",   full:"Silver vs USD",       contractSize:5000, pointSize:0.001,  pointValue:5,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.03 pts" },
-  { id:"XPTUSD",  cat:"Metals",  flag:"⚪", label:"XPTUSD",   full:"Platinum vs USD",     contractSize:100,  pointSize:0.01,   pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"2.0 pts"  },
-  { id:"XPDUSD",  cat:"Metals",  flag:"🔘", label:"XPDUSD",   full:"Palladium vs USD",    contractSize:100,  pointSize:0.01,   pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"5.0 pts"  },
-  { id:"XCUUSD",  cat:"Metals",  flag:"🟤", label:"XCUUSD",   full:"Copper vs USD",       contractSize:25000,pointSize:0.0001, pointValue:2.5,    currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.004 pts"},
+  { id:"XAUUSD",  cat:"Metals",  flag:"🥇", label:"XAUUSD",   full:"Gold vs USD",         contractSize:100,  pointSize:0.01,   pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.1 pts",  swapType:"per_lot" },
+  { id:"XAGUSD",  cat:"Metals",  flag:"🥈", label:"XAGUSD",   full:"Silver vs USD",       contractSize:5000, pointSize:0.001,  pointValue:5,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.03 pts", swapType:"per_lot" },
+  { id:"XPTUSD",  cat:"Metals",  flag:"⚪", label:"XPTUSD",   full:"Platinum vs USD",     contractSize:100,  pointSize:0.01,   pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"2.0 pts",  swapType:"per_lot" },
+  { id:"XPDUSD",  cat:"Metals",  flag:"🔘", label:"XPDUSD",   full:"Palladium vs USD",    contractSize:100,  pointSize:0.01,   pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"5.0 pts",  swapType:"per_lot" },
+  { id:"XCUUSD",  cat:"Metals",  flag:"🟤", label:"XCUUSD",   full:"Copper vs USD",       contractSize:25000,pointSize:0.0001, pointValue:2.5,    currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.004 pts",swapType:"per_lot" },
   // ── Energies ──
-  { id:"USOIL",   cat:"Energy",  flag:"🛢️", label:"USOIL",    full:"WTI Crude Oil",       contractSize:1000, pointSize:0.01,   pointValue:10,     currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.04 pts" },
-  { id:"UKOIL",   cat:"Energy",  flag:"🛢️", label:"UKOIL",    full:"Brent Crude Oil",     contractSize:1000, pointSize:0.01,   pointValue:10,     currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.04 pts" },
-  { id:"NATGAS",  cat:"Energy",  flag:"⛽", label:"NATGAS",   full:"Natural Gas",         contractSize:10000,pointSize:0.001,  pointValue:10,     currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.01 pts" },
+  { id:"USOIL",   cat:"Energy",  flag:"🛢️", label:"USOIL",    full:"WTI Crude Oil",       contractSize:1000, pointSize:0.01,   pointValue:10,     currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.04 pts", swapType:"per_lot" },
+  { id:"UKOIL",   cat:"Energy",  flag:"🛢️", label:"UKOIL",    full:"Brent Crude Oil",     contractSize:1000, pointSize:0.01,   pointValue:10,     currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.04 pts", swapType:"per_lot" },
+  { id:"NATGAS",  cat:"Energy",  flag:"⛽", label:"NATGAS",   full:"Natural Gas",         contractSize:10000,pointSize:0.001,  pointValue:10,     currency:"USD", minLot:0.01, lotStep:0.01, spread:"0.01 pts", swapType:"per_lot" },
   // ── Crypto ──
-  { id:"BTCUSD",  cat:"Crypto",  flag:"₿",  label:"BTCUSD",   full:"Bitcoin vs USD",      contractSize:1,    pointSize:1,      pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"25 pts"   },
-  { id:"ETHUSD",  cat:"Crypto",  flag:"Ξ",  label:"ETHUSD",   full:"Ethereum vs USD",     contractSize:1,    pointSize:0.1,    pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"1.5 pts"  },
+  { id:"BTCUSD",  cat:"Crypto",  flag:"₿",  label:"BTCUSD",   full:"Bitcoin vs USD",      contractSize:1,    pointSize:1,      pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"25 pts",   swapType:"pct"     },
+  { id:"ETHUSD",  cat:"Crypto",  flag:"Ξ",  label:"ETHUSD",   full:"Ethereum vs USD",     contractSize:1,    pointSize:0.1,    pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"1.5 pts",  swapType:"pct"     },
   // ── Custom ──
-  { id:"CUSTOM",  cat:"Custom",  flag:"⚙️", label:"CUSTOM",   full:"Custom instrument",   contractSize:100,  pointSize:1,      pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"—"        },
+  { id:"CUSTOM",  cat:"Custom",  flag:"⚙️", label:"CUSTOM",   full:"Custom instrument",   contractSize:100,  pointSize:1,      pointValue:1,      currency:"USD", minLot:0.01, lotStep:0.01, spread:"—",        swapType:"pct"     },
 ];
 
 const SYM_CATS = ["All", "Indices", "Metals", "Energy", "Crypto", "Custom"];
@@ -1066,12 +1066,19 @@ function buildCalc() {
               <input class="input" id="edit-sym-currency" value="${instSym.currency}" />
             </div>
             <div>
-              <label class="label">LONG SWAP (%/year)</label>
-              <input class="input" id="edit-sym-swaplong" inputmode="decimal" value="${instSym.swapLong != null ? instSym.swapLong : ''}" placeholder="e.g. -6.0" />
+              <label class="label">SWAP RATE TYPE</label>
+              <select class="input" id="edit-sym-swaptype" style="cursor:pointer;">
+                <option value="pct"     ${(instSym.swapType||'pct')==='pct'     ? 'selected' : ''}>% per year — Indices &amp; Crypto</option>
+                <option value="per_lot" ${instSym.swapType==='per_lot'           ? 'selected' : ''}>$/lot/night — Metals &amp; Energy</option>
+              </select>
             </div>
             <div>
-              <label class="label">SHORT SWAP (%/year)</label>
-              <input class="input" id="edit-sym-swapshort" inputmode="decimal" value="${instSym.swapShort != null ? instSym.swapShort : ''}" placeholder="e.g. 1.1" />
+              <label class="label">LONG SWAP</label>
+              <input class="input" id="edit-sym-swaplong" inputmode="decimal" value="${instSym.swapLong != null ? instSym.swapLong : ''}" placeholder="${(instSym.swapType||'pct')==='pct' ? 'e.g. -6.0' : 'e.g. -4.50'}" />
+            </div>
+            <div>
+              <label class="label">SHORT SWAP</label>
+              <input class="input" id="edit-sym-swapshort" inputmode="decimal" value="${instSym.swapShort != null ? instSym.swapShort : ''}" placeholder="${(instSym.swapType||'pct')==='pct' ? 'e.g. 1.1' : 'e.g. 1.20'}" />
             </div>
           </div>
           <div style="display:flex;gap:8px;">
@@ -1091,13 +1098,14 @@ function buildCalc() {
         const currency = $("edit-sym-currency").value.trim().toUpperCase() || instSym.currency;
         const swapLongStr  = $("edit-sym-swaplong").value.trim();
         const swapShortStr = $("edit-sym-swapshort").value.trim();
-        const swapLong  = swapLongStr  !== "" ? parseFloat(swapLongStr)  : null;
-        const swapShort = swapShortStr !== "" ? parseFloat(swapShortStr) : null;
+        const swapLong   = swapLongStr  !== "" ? parseFloat(swapLongStr)  : null;
+        const swapShort  = swapShortStr !== "" ? parseFloat(swapShortStr) : null;
+        const swapType   = $("edit-sym-swaptype").value;
         if (!label) { $("edit-sym-name").style.borderColor="#e8445a"; return; }
 
         const updated = { ...instSym, label, full: label, pointValue: ptVal,
           contractSize: contract, pointSize: ptSize, currency, custom: true,
-          swapLong, swapShort };
+          swapLong, swapShort, swapType };
 
         // If it's already custom, update in place; otherwise add as custom override
         const existIdx = customSymbols.findIndex(s => s.id === instSym.id);
@@ -1144,6 +1152,15 @@ function buildCalc() {
     const curInst = inst2sym(cfdSymbolId);
     if (curInst.swapLong  != null) swapFields.long  = String(curInst.swapLong);
     if (curInst.swapShort != null) swapFields.short = String(curInst.swapShort);
+  }
+  // Update swap input labels & placeholders based on symbol's swap type
+  if (calcMode === "cfd") {
+    const st   = inst2sym(cfdSymbolId).swapType || "pct";
+    const unit = st === "pct" ? "%/year" : "$/lot/night";
+    if ($("lbl-sw-long"))  $("lbl-sw-long").textContent  = `LONG SWAP (${unit})`;
+    if ($("lbl-sw-short")) $("lbl-sw-short").textContent = `SHORT SWAP (${unit})`;
+    $("sw-long").placeholder  = st === "pct" ? "e.g. -6.0"  : "e.g. -4.50";
+    $("sw-short").placeholder = st === "pct" ? "e.g. 1.1"   : "e.g. 1.20";
   }
   $("sw-long").value    = swapFields.long;
   $("sw-short").value   = swapFields.short;
@@ -1333,27 +1350,35 @@ function computeSwap() {
     const rateStr  = calcDir === "long" ? swapFields.long : swapFields.short;
     const swapRate = parseFloat(rateStr);
 
-    if (isNaN(swapRate)) { empty("Enter annual swap rate (%) above."); return; }
+    if (isNaN(swapRate)) { empty("Enter swap rate above."); return; }
     if (swapRate === 0)  { empty("No daily swap cost — holding is free for this direction."); return; }
 
-    // Notional per lot = (entry / pointSize) × pointValue
-    const inst           = inst2sym(cfdSymbolId);
-    const entry          = toNum(cfdFields.entry);
-    const notionalPerLot = entry > 0 ? (entry / inst.pointSize) * inst.pointValue : null;
-    const isPaying       = swapRate < 0;
-    const dailyCost      = lots && notionalPerLot
-      ? lots * notionalPerLot * Math.abs(swapRate) / 100 / 360 : null;
-    const dailyLabel     = isPaying ? "DAILY SWAP COST" : "DAILY SWAP CREDIT";
-    const daysHeld       = toNum(swapFields.days);
-    const totalSwap      = dailyCost && daysHeld > 0 ? dailyCost * daysHeld : null;
-    const gainAfter      = maxGain != null && totalSwap != null
+    const inst     = inst2sym(cfdSymbolId);
+    const swapType = inst.swapType || "pct";
+    const entry    = toNum(cfdFields.entry);
+    const isPaying = swapRate < 0;
+    let dailyCost  = null;
+
+    if (swapType === "pct") {
+      const notionalPerLot = entry > 0 ? (entry / inst.pointSize) * inst.pointValue : null;
+      dailyCost = lots && notionalPerLot ? lots * notionalPerLot * Math.abs(swapRate) / 100 / 360 : null;
+    } else {
+      dailyCost = lots ? lots * Math.abs(swapRate) : null;
+    }
+
+    const dailyLabel = isPaying ? "DAILY SWAP COST" : "DAILY SWAP CREDIT";
+    const daysHeld   = toNum(swapFields.days);
+    const totalSwap  = dailyCost && daysHeld > 0 ? dailyCost * daysHeld : null;
+    const gainAfter  = maxGain != null && totalSwap != null
       ? (isPaying ? maxGain - totalSwap : maxGain + totalSwap) : null;
-    const daysUntil      = maxGain != null && dailyCost && isPaying
+    const daysUntil  = maxGain != null && dailyCost && isPaying
       ? Math.floor(maxGain / dailyCost) : null;
 
     let html = "";
-    html += rowS("ANNUAL RATE", `${swapRate}%`, isPaying ? "#e8445a" : "#00d4aa", calcDir + " position");
-    if (!notionalPerLot) {
+    const rateLabel = swapType === "pct" ? "ANNUAL RATE" : "RATE/LOT/NIGHT";
+    const rateVal   = swapType === "pct" ? `${swapRate}%` : `${swapRate > 0 ? "+" : ""}${swapRate} $`;
+    html += rowS(rateLabel, rateVal, isPaying ? "#e8445a" : "#00d4aa", calcDir + " position");
+    if (swapType === "pct" && entry <= 0) {
       html += `<div style="padding:8px 0 4px;color:#3a3f4a;font-size:11px;">Enter entry price to calculate daily cost.</div>`;
     } else if (dailyCost != null) {
       html += rowS(dailyLabel,
