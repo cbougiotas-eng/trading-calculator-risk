@@ -907,6 +907,9 @@ function buildCalc() {
     row.onclick = (e) => {
       if(e.target.classList.contains("del-sym-btn")) return;
       cfdSymbolId = row.dataset.sid;
+      const selSym = inst2sym(cfdSymbolId);
+      if (selSym.swapLong  != null) swapFields.long  = String(selSym.swapLong);
+      if (selSym.swapShort != null) swapFields.short = String(selSym.swapShort);
       cfdFields.pipval = "";
       searchEl.value = "";
       symCatFilter = "All";
@@ -1026,6 +1029,8 @@ function buildCalc() {
           <div><div style="color:#4a5060;font-size:9px;letter-spacing:.08em;">POINT SIZE</div><div style="color:#8a909c;font-size:11px;margin-top:2px;">${instSym.pointSize}</div></div>
           <div><div style="color:#4a5060;font-size:9px;letter-spacing:.08em;">POINT VALUE</div><div style="color:#8a909c;font-size:11px;margin-top:2px;">${instSym.pointValue} ${instSym.currency}/lot</div></div>
           <div><div style="color:#4a5060;font-size:9px;letter-spacing:.08em;">MIN LOT</div><div style="color:#8a909c;font-size:11px;margin-top:2px;">${instSym.minLot}</div></div>
+          ${instSym.swapLong  != null ? `<div><div style="color:#4a5060;font-size:9px;letter-spacing:.08em;">SWAP LONG</div><div style="color:${instSym.swapLong<0?'#e8445a':'#00d4aa'};font-size:11px;margin-top:2px;">${instSym.swapLong}/lot</div></div>` : ''}
+          ${instSym.swapShort != null ? `<div><div style="color:#4a5060;font-size:9px;letter-spacing:.08em;">SWAP SHORT</div><div style="color:${instSym.swapShort<0?'#e8445a':'#00d4aa'};font-size:11px;margin-top:2px;">${instSym.swapShort}/lot</div></div>` : ''}
         </div>
       </div>`;
 
@@ -1060,6 +1065,14 @@ function buildCalc() {
               <label class="label">CURRENCY</label>
               <input class="input" id="edit-sym-currency" value="${instSym.currency}" />
             </div>
+            <div>
+              <label class="label">LONG SWAP ($/lot/night)</label>
+              <input class="input" id="edit-sym-swaplong" inputmode="decimal" value="${instSym.swapLong != null ? instSym.swapLong : ''}" placeholder="e.g. -5.00" />
+            </div>
+            <div>
+              <label class="label">SHORT SWAP ($/lot/night)</label>
+              <input class="input" id="edit-sym-swapshort" inputmode="decimal" value="${instSym.swapShort != null ? instSym.swapShort : ''}" placeholder="e.g. 3.00" />
+            </div>
           </div>
           <div style="display:flex;gap:8px;">
             <button id="save-edit-sym" class="btn-green" style="flex:1;">SAVE CHANGES</button>
@@ -1076,10 +1089,15 @@ function buildCalc() {
         const contract = parseFloat($("edit-sym-contract").value) || instSym.contractSize;
         const ptSize   = parseFloat($("edit-sym-ptsize").value)   || instSym.pointSize;
         const currency = $("edit-sym-currency").value.trim().toUpperCase() || instSym.currency;
+        const swapLongStr  = $("edit-sym-swaplong").value.trim();
+        const swapShortStr = $("edit-sym-swapshort").value.trim();
+        const swapLong  = swapLongStr  !== "" ? parseFloat(swapLongStr)  : null;
+        const swapShort = swapShortStr !== "" ? parseFloat(swapShortStr) : null;
         if (!label) { $("edit-sym-name").style.borderColor="#e8445a"; return; }
 
         const updated = { ...instSym, label, full: label, pointValue: ptVal,
-          contractSize: contract, pointSize: ptSize, currency, custom: true };
+          contractSize: contract, pointSize: ptSize, currency, custom: true,
+          swapLong, swapShort };
 
         // If it's already custom, update in place; otherwise add as custom override
         const existIdx = customSymbols.findIndex(s => s.id === instSym.id);
@@ -1089,6 +1107,8 @@ function buildCalc() {
           // Preset override — save as custom with same id
           customSymbols.push({ ...updated, id: instSym.id });
         }
+        if (swapLong  != null) swapFields.long  = String(swapLong);
+        if (swapShort != null) swapFields.short = String(swapShort);
         cfdSymbolId = instSym.id;
         cfdFields.pipval = "";
         saveCustomSymbols(); buildCalc(); computeCalc(); saveCalc();
@@ -1119,6 +1139,12 @@ function buildCalc() {
   });
 
   // ── Swap section ──
+  // On first load, auto-fill swap from selected symbol if nothing saved yet
+  if (calcMode === "cfd" && swapFields.long === "" && swapFields.short === "") {
+    const curInst = inst2sym(cfdSymbolId);
+    if (curInst.swapLong  != null) swapFields.long  = String(curInst.swapLong);
+    if (curInst.swapShort != null) swapFields.short = String(curInst.swapShort);
+  }
   $("sw-long").value    = swapFields.long;
   $("sw-short").value   = swapFields.short;
   $("sw-days").value    = swapFields.days;
